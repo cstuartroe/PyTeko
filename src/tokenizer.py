@@ -1,4 +1,5 @@
 import re
+from collections import namedtuple
 
 from .general import TekoException
 
@@ -19,6 +20,8 @@ def is_white(c):
 def is_punct(c):
     return c in PUNCT
 
+Token = namedtuple("Token",["string","position","line_number"])
+
 class Tokenizer:
     PUNCT_COMBOS = ["==","<=",">=","!=","<:","+=","-=","*=",
                     "/=","^=","%%=","{}","[]","<>"]
@@ -27,8 +30,9 @@ class Tokenizer:
         pass
 
     def tokenize(self,s):
-        self.s = s
+        self.s = s + "\n"
         self.i = 0
+        self.line_number = 1
         self.tokens = []
         
         while self.i < len(self.s):
@@ -51,10 +55,12 @@ class Tokenizer:
                 self.grab_punct()
                 
             elif is_white(self.next()):
+                if self.next() == "\n":
+                    self.line_number += 1
                 self.i += 1
                 
             else:
-                TekoException("Unknown character: " + self.next())
+                TekoException("Unknown character: " + self.next(), self.line_number)
 
         return self.tokens
 
@@ -73,71 +79,78 @@ class Tokenizer:
         assert(self.next(2) == "/*")
         while self.next(2) != "*/":
             self.i += 1
+            if self.next() == "\n":
+                self.line_number += 1
             if self.next(2) is None:
-                TekoException("EOF while parsing multiline comment")
+                TekoException("EOF while parsing multiline comment", self.line_number)
         self.i += 2
 
     def grab_string(self):
         assert(self.next() == '"')
+        token_string = '"'
         self.i += 1
-        token = ""
+        start = self.i + 0
         
         while self.next() != '"':
-            if self.next(2) == r'\"':
-                token += '"'
+            if self.next(2) in [r'\"',r'\\']:
+                token_string += self.next(2)
                 self.i += 2
-            elif self.next(2) == r'\n':
-                token += "\n"
-                self.i += 2
-            elif self.next(2) == r'\t':
-                token += "\t"
-                self.i += 2
+            elif self.next() == "\n":
+                TekoException("EOL while parsing string", self.line_number)
             else:
                 c = self.next()
                 if c is None:
-                    TekoException("EOF while parsing string")
-                token += c
+                    TekoException("EOF while parsing string", self.line_number)
+                token_string += c
                 self.i += 1
                 
-        self.i += 1                
+        self.i += 1
+
+        token = Token(string=token_string, position=start, line_number = self.line_number)
         self.tokens.append(token)
 
     def grab_label(self):
         assert(is_alpha(self.next()))
-        token = self.next()
+        token_string = self.next()
+        start = self.i + 0
         self.i += 1
         
         while is_alpha(self.next()) or is_num(self.next()):
-            token += self.next()
+            token_string += self.next()
             self.i += 1
-            
+
+        token = Token(string=token_string, position=start, line_number = self.line_number)
         self.tokens.append(token)
 
     def grab_num(self):
         assert(is_num(self.next()))
-        token = self.next()
+        token_string = self.next()
+        start = self.i + 0
         self.i += 1
         
         while is_num(self.next()):
-            token += self.next()
+            token_string += self.next()
             self.i += 1
             
         if self.next() == ".":
-            token += self.next()
+            token_string += self.next()
             self.i += 1
             while is_num(self.next()):
-                token += self.next()
+                token_string += self.next()
                 self.i += 1
-            
+
+        token = Token(string=token_string, position=start, line_number = self.line_number)
         self.tokens.append(token)
 
     def grab_punct(self):
         assert(is_punct(self.next()))
-        token = self.next()
+        token_string = self.next()
+        start = self.i + 0
         self.i += 1
 
-        while self.next() is not None and (token + self.next()) in Tokenizer.PUNCT_COMBOS:
-            token += self.next()
+        while self.next() is not None and (token_string + self.next()) in Tokenizer.PUNCT_COMBOS:
+            token_string += self.next()
             self.i += 1
 
+        token = Token(string=token_string, position=start, line_number = self.line_number)
         self.tokens.append(token)            

@@ -1,4 +1,4 @@
-from .tokenizer import is_alpha, is_num
+from .tokenizer import is_alpha, is_num, Token
 
 BRACES = {"paren","curly","square","angle"}
 BINOPS = {"+","-","*","/","^","%","&&","||"}
@@ -23,15 +23,15 @@ class Tag:
                 "SetterTag":{"setter"},"ComparisonTag":{"comparison"},
                 "ConversionTag":{"conversion"}}
 
-    def __init__(self,tagType,vals={}):
+    def __init__(self,tagType,token,vals={}):
         assert(tagType in Tag.tagTypes)
-        try:
-            assert(set(vals.keys()) == Tag.tagTypes[tagType])
-        except AssertionError as e:
-            print(tagType, vals, set(vals.keys()), Tag.tagTypes[tagType])
-            raise e
+        assert(type(token) == Token)
+        assert(set(vals.keys()) == Tag.tagTypes[tagType])
+        
         self.tagType = tagType
+        self.token = token
         self.vals = vals
+        
         if self.tagType in ENUM_TAGTYPES:
             assert(self.only_val() in ENUM_TAGTYPES[self.tagType])
 
@@ -71,29 +71,31 @@ class Tag:
 
 def get_tags(tokens):    
     for token in tokens:
-        if token in STATIC_TAGS: yield Tag(STATIC_TAGS[token])
+        s = token.string
+        
+        if s in STATIC_TAGS: yield Tag(STATIC_TAGS[s],token)
 
-        elif token == "(": yield Tag("OpenTag",{"brace":"paren"})
-        elif token == ")": yield Tag("CloseTag",{"brace":"paren"})
-        elif token == "{": yield Tag("OpenTag",{"brace":"curly"})
-        elif token == "}": yield Tag("CloseTag",{"brace":"curly"})
-        elif token == "[": yield Tag("OpenTag",{"brace":"square"})
-        elif token == "]": yield Tag("CloseTag",{"brace":"square"})
-        elif token == "<": yield Tag("LAngleTag")
-        elif token == ">": yield Tag("RAngleTag")
+        elif s == "(": yield Tag("OpenTag",token,{"brace":"paren"})
+        elif s == ")": yield Tag("CloseTag",token,{"brace":"paren"})
+        elif s == "{": yield Tag("OpenTag",token,{"brace":"curly"})
+        elif s == "}": yield Tag("CloseTag",token,{"brace":"curly"})
+        elif s == "[": yield Tag("OpenTag",token,{"brace":"square"})
+        elif s == "]": yield Tag("CloseTag",token,{"brace":"square"})
+        elif s == "<": yield Tag("LAngleTag",token)
+        elif s == ">": yield Tag("RAngleTag",token)
 
-        elif token in BINOPS: yield Tag("BinOpTag",{"binop":token})
-        elif token in SETTERS: yield Tag("SetterTag",{"setter":token})
-        elif token in COMPARISONS: yield Tag("ComparisonTag",{"comparison":token})
-        elif token in CONVERSIONS: yield Tag("ConversionTag",{"conversion":token})
+        elif s in BINOPS: yield Tag("BinOpTag",token,{"binop":s})
+        elif s in SETTERS: yield Tag("SetterTag",token,{"setter":s})
+        elif s in COMPARISONS: yield Tag("ComparisonTag",token,{"comparison":s})
+        elif s in CONVERSIONS: yield Tag("ConversionTag",token,{"conversion":s})
 
-        elif token == "true": yield Tag("BoolTag",{"bool":True})
-        elif token == "false": yield Tag("BoolTag",{"bool":False})
+        elif s == "true": yield Tag("BoolTag",token,{"bool":True})
+        elif s == "false": yield Tag("BoolTag",token,{"bool":False})
 
-        elif token[0] == '"': yield Tag("StringTag",{"string":token[1:]})
-        elif is_alpha(token[0]): yield Tag("LabelTag", {"label":token})
-        elif is_num(token[0]):
-            if "." in token:
-                yield Tag("RealTag",{"real":eval(token+"0")})
+        elif s[0] == '"': yield Tag("StringTag",token,{"string":s})
+        elif is_alpha(s[0]): yield Tag("LabelTag",token,{"label":s})
+        elif is_num(s[0]):
+            if "." in s:
+                yield Tag("RealTag",token,{"real":eval(s+"0")})
             else:
-                yield Tag("IntTag",{"int":eval(token)})
+                yield Tag("IntTag",token,{"int":eval(s)})
