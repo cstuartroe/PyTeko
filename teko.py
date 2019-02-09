@@ -1,7 +1,6 @@
 import argparse
 
-from src.tokenizer import tokenize
-from src.tagger import get_tags
+from src.parser import TekoParser
 
 parser = argparse.ArgumentParser()
 parser.add_argument('file', metavar="path/to/file", type=str,
@@ -9,9 +8,10 @@ parser.add_argument('file', metavar="path/to/file", type=str,
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    with open(args.file,"r",encoding="utf-8") as fh:
-        source = fh.read()
-    ts = tokenize(source)
-    tags = get_tags(ts)
-    for tag in tags:
-        print(tag)
+        
+    tp = TekoParser(args.file)
+    cb = tp.parse()
+    for line in cb.lines:
+        print()
+        for tag in line:
+            print(tag)
