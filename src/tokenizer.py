@@ -1,5 +1,7 @@
 import re
 
+from .general import TekoException
+
 alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 nums = "0123456789"
 white = " \t\n"
@@ -42,7 +44,7 @@ def tokenize(s):
         elif s[0] in white:
             s, _ = grab(s,"white")
         else:
-            raise ValueError("unknown character " + s[0])
+            TekoException("unknown character " + s[0])
         if new:
             tokens.append(new)
     return tokens

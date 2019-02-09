@@ -9,7 +9,7 @@ parser.add_argument('file', metavar="path/to/file", type=str,
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    with open(args.file,"r") as fh:
+    with open(args.file,"r",encoding="utf-8") as fh:
         source = fh.read()
     ts = tokenize(source)
     tags = get_tags(ts)
