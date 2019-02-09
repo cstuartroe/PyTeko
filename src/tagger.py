@@ -1,4 +1,4 @@
-from .tokenizer import alpha, nums
+from .tokenizer import is_alpha, is_num
 
 BRACES = {"paren","curly","square","angle"}
 BINOPS = {"+","-","*","/","^","%","&&","||"}
@@ -7,6 +7,9 @@ COMPARISONS = {"==","!=","<","<=",">",">=","<:"}
 CONVERSIONS = {".","$","[]","{}","<>"}
 ENUM_TAGTYPES = {"OpenTag":BRACES,"CloseTag":BRACES,"SetterTag":SETTERS,
                  "ComparisonTag":COMPARISONS,"ConversionTag":CONVERSIONS}
+STATIC_TAGS = {";":"SemicolonTag",":":"ColonTag",",":"CommaTag","?":"QMarkTag",
+               "!":"BangTag","if":"IfTag","else":"ElseTag","for":"ForTag",
+               "while":"WhileTag","in":"InTag","let":"LetTag"}
 
 class Tag:
     tagTypes = {"LabelTag":{"label"}, "StringTag":{"string"},
@@ -58,22 +61,17 @@ class Tag:
             elif brace == "angle": s = ">"
         else:
             s = ""
-        return self.tagType + " " + s
+        return "<" + self.tagType + " " + s + " >"
 
-def get_tags(tokens):
+    def __repr__(self):
+        return str(self)
+
+    def __eq__(self,other):
+        return self.tagType == other.tagType and self.vals == other.vals
+
+def get_tags(tokens):    
     for token in tokens:
-        if token == ";": yield Tag("SemicolonTag")
-        elif token == ":": yield Tag("ColonTag")
-        elif token == ",": yield Tag("CommaTag")
-        elif token == "?": yield Tag("QMarkTag")
-        elif token == "!": yield Tag("BangTag")
-
-        elif token == "if": yield Tag("IfTag")
-        elif token == "else": yield Tag("ElseTag")
-        elif token == "for": yield Tag("ForTag")
-        elif token == "while": yield Tag("WhileTag")
-        elif token == "in": yield Tag("InTag")
-        elif token == "let": yield Tag("LetTag")
+        if token in STATIC_TAGS: yield Tag(STATIC_TAGS[token])
 
         elif token == "(": yield Tag("OpenTag",{"brace":"paren"})
         elif token == ")": yield Tag("CloseTag",{"brace":"paren"})
@@ -92,9 +90,9 @@ def get_tags(tokens):
         elif token == "true": yield Tag("BoolTag",{"bool":True})
         elif token == "false": yield Tag("BoolTag",{"bool":False})
 
-        elif token[0] == '"': yield Tag("StringTag",{"string":eval(token)})
-        elif token[0] in alpha: yield Tag("LabelTag", {"label":token})
-        elif token[0] in nums:
+        elif token[0] == '"': yield Tag("StringTag",{"string":token[1:]})
+        elif is_alpha(token[0]): yield Tag("LabelTag", {"label":token})
+        elif is_num(token[0]):
             if "." in token:
                 yield Tag("RealTag",{"real":eval(token+"0")})
             else:
