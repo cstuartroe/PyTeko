@@ -2,7 +2,7 @@ from cx_Freeze import setup, Executable
 
 base = None    
 
-executables = [Executable("teko.py", base=base)]
+executables = [Executable("pyteko.py", base=base)]
 
 packages = ["idna"]
 options = {
@@ -12,7 +12,7 @@ options = {
 }
 
 setup(
-    name = "teko",
+    name = "pyteko",
     options = options,
     version = "0.0",
     description = 'a python implementation of Teko',

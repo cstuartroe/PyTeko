@@ -40,6 +40,7 @@ def isTekoInstance(tekoObj, tekoType):
 TekoString = TekoObject(TekoType)
 TekoInt    = TekoObject(TekoType)
 TekoReal   = TekoObject(TekoType)
+TekoBool   = TekoObject(TekoType)
 
 if __name__ == "__main__":
     # some subtyping tests
