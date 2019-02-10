@@ -39,7 +39,7 @@ class AssignmentStatement(Statement):
         self.line_number = self.left.line_number
 
     def __str__(self):
-        return str(self.left) + " = (" + str(self.right) + ");"
+        return str(self.left) + " = " + str(self.right) + ";"
 
 class ExpressionStatement(Statement):
     def __init__(self, expression):
@@ -52,7 +52,7 @@ class ExpressionStatement(Statement):
         return str(self.expression) + ";"
 
 class IfStatement(Statement):
-    def __init__(self, line_number, condition, codeblock, else_stmt):
+    def __init__(self, line_number, condition, codeblock, else_stmt=None):
         super().__init__(line_number)
 
         assert(isinstance(condition, Expression))
@@ -63,6 +63,13 @@ class IfStatement(Statement):
         self.codeblock = codeblock
         self.else_stmt = else_stmt
 
+    def __str__(self):
+        s = "if (" + str(self.condition) + ") "
+        s += str(self.codeblock)
+        if self.else_stmt:
+            s += " else " + str(self.else_stmt)
+        return s
+
 class WhileBlock(Statement):
     def __init__(self, line_number, condition, codeblock):
         super().__init__(line_number)
@@ -72,6 +79,9 @@ class WhileBlock(Statement):
 
         self.condition = condition
         self.codeblock = codeblock
+
+    def __str__(self):
+        return "while (" + str(self.condition) + ") " + str(self.codeblock)
 
 class ForBlock(Statement):
     def __init__(self, line_number, tekotype, label, iterable, codeblock):

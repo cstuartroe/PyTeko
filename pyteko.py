@@ -12,3 +12,4 @@ if __name__ == "__main__":
     tp = TekoParser(args.file)
     for stmt in tp.parse():
         print(stmt)
+        print()

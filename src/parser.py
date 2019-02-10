@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 from .general import TekoException
-from .tokenizer import Tokenizer
+from .tokenizer import Tokenizer, Token
 from .tagger import *
 from .types import *
 from .parsenode import*
@@ -181,33 +181,35 @@ class TekoParser:
         
         self.expect("IfTag")
         self.expect("OpenTag",{"brace":"paren"})
-        
         cond = self.grab_expression()
-        if not cond.tekotype is TekoBool:
-            TekoException("Must be a boolean expression",self.next().token.line_number)
-            
         self.expect("CloseTag",{"brace":"paren"})
-        self.expect("OpenTag",{"brace":"curly"})
-
         cb = self.grab_codeblock()
-
-        self.expect("CloseTag",{"brace":"curly"})
 
         if self.more() and self.next().tagType == "ElseTag":
             self.step()
             if self.next().tagType == "IfTag":
                 else_stmt = self.grab_if()
             else:
-                self.expect("OpenTag",{"brace":"curly"})
-                cb = self.grab_codeblock()
-                self.expect("CloseTag",{"brace":"curly"})
-                raise BaseException("Not implemented!")
+                else_line_number = self.next().token.line_number
+                nonce_token = Token(string="true",position=None,line_number=else_line_number)
+                else_cond = SimpleExpression(Tag("BoolTag",nonce_token,{"bool":True}))
+                else_cb = self.grab_codeblock()
+                else_stmt = IfStatement(line_number = else_line_number, condition = else_cond, codeblock = else_cb)
         else:
             else_stmt = None
 
         return IfStatement(line_number = line_number, condition = cond, codeblock = cb, else_stmt = else_stmt)
 
-    # def grab_while
+    def grab_while(self):
+        line_number = self.next().token.line_number
+        
+        self.expect("WhileTag")
+        self.expect("OpenTag",{"brace":"paren"})
+        cond = self.grab_expression()
+        self.expect("CloseTag",{"brace":"paren"})
+        cb = self.grab_codeblock()
+
+        return WhileBlock(line_number, cond, cb)        
 
     # def grab_for
 
