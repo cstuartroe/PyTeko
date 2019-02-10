@@ -17,7 +17,7 @@ class Tag:
                 "BoolTag":{"bool"}, "IfTag":set(), "ElseTag":set(),
                 "ForTag":set(),"WhileTag":set(), "InTag":set(), "LetTag":set(),
                 "SemicolonTag":set(),"ColonTag":set(), "CommaTag":set(),
-                "QMarkTag":set(), "BangTag":set(),"AttrTag":set(),
+                "QMarkTag":set(), "BangTag":set(),"DotTag":set(),
                 "OpenTag":{"brace"},"CloseTag":{"brace"},
                 "LAngleTag":set(),"RAngleTag":set(), "BinOpTag":{"binop"},
                 "SetterTag":{"setter"},"ComparisonTag":{"comparison"},
@@ -83,6 +83,7 @@ def get_tags(tokens):
         elif s == "]": yield Tag("CloseTag",token,{"brace":"square"})
         elif s == "<": yield Tag("LAngleTag",token)
         elif s == ">": yield Tag("RAngleTag",token)
+        elif s == ".": yield Tag("DotTag",token)
 
         elif s in BINOPS: yield Tag("BinOpTag",token,{"binop":s})
         elif s in SETTERS: yield Tag("SetterTag",token,{"setter":s})

@@ -1,23 +1,15 @@
 from .tagger import BRACES, BINOPS, COMPARISONS, CONVERSIONS
 
+SIMPLE_EXPR_TAGTYPES = {"IntTag", "RealTag", "BoolTag",
+                        "StringTag", "LabelTag"}
+
 # the Node is the basic unit of a parse tree
 # each its attributes must be a Node, a list of Nodes, or a Tag
 
 class Node:
-    def __init__(line_number):
+    def __init__(self,line_number):
         assert(type(line_number) == int)
         self.line_number = line_number
-
-# a codeblock is just a series of statements
-# a file is a codeblock, as is the body of a function or block
-
-class CodeBlock(Node):
-    def __init__(self,statements):        
-        assert(type(statements) == list)
-        assert(all(isinstance(item,Statement) for item in statements))
-        self.statements = statements
-
-        self.line_number = self.statements[0].line_number
 
 # statements - single instructions that can be executed
 # include declarations, assignments, expressions, ifs, fors, whiles
@@ -90,43 +82,26 @@ class ForBlock(Statement):
 # # #
 
 class Declaration(Node):
-    def __init__(self, tekotype, label, struct=None, expression=None, codeblock=None):
+    def __init__(self, tekotype, label, struct=None, expression=None):
         assert(isinstance(tekotype, Expression))
         assert(label.tagType == "LabelTag")
         assert(struct is None or isinstance(struct, StructExpression))
         assert(expression is None or isinstance(expression, Expression))
-        assert(codeblock is None or isinstance(codeblock, CodeBlock))
-
-        # a variable can only be set to a codeblock if it is a function
-        # it is a function if and only if it has a struct
-        if struct is None:
-            assert(codeblock is None)
-
-        # the variable can only be set to either an expression or a codeblock
-        if expression:
-            assert(codeblock is None)
-        # but it could be neither - not initialized at all
 
         self.tekotype = tekotype
         self.label = label
         self.struct = struct
         self.expression = expression
-        self.codeblock = codeblock
 
         self.line_number = self.tekotype.line_number
 
 class Assignment(Node):
-    def __init__(self, label, expression=None, codeblock=None):
+    def __init__(self, label, expression=None):
         assert(label.tagType == "LabelTag")
         assert(expression is None or isinstance(expression, Expression))
-        assert(codeblock is None or isinstance(codeblock, CodeBlock))
-
-        # the variable must be set to either an expression or a codeblock
-        assert((expression is None) != (codeblock is None))
 
         self.label = label
         self.exression = expression
-        self.codeblock = codeblock
 
         self.line_number = label.token.line_number
 
@@ -136,11 +111,12 @@ class Expression(Node):
     def __init__(self, line_number):
         super().__init__(line_number)
 
-class SimpleExpression(Expression):
-    SIMPLE_TAGTYPES = {"IntTag", "RealTag", "BoolTag", "StringTag", "LabelTag"}
+    def evaluate():
+        raise ValueError("Not implemented yet!")
 
+class SimpleExpression(Expression):
     def __init__(self, tag):
-        assert(tag.tagType in SimpleExpression.SIMPLE_TAGTYPES)
+        assert(tag.tagType in SIMPLE_EXPR_TAGTYPES)
         self.tag = tag
 
         self.line_number = self.tag.token.line_number
@@ -202,5 +178,13 @@ class ConversionExpression(Expression):
         self.conv = conv
 
         self.line_number = leftexpr.line_number
+
+class CodeBlock(Expression):
+    def __init__(self, line_number, statements):
+        super().__init__(line_number)
+        
+        assert(type(statements) == list)
+        assert(all(isinstance(item,Statement) for item in statements))
+        self.statements = statements
 
 # TODO: MapExpression, ArgNode, NewStruct
