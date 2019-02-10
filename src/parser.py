@@ -57,16 +57,6 @@ class TekoParser:
         while self.more():
             yield self.grab_statement()
 
-    def grab_codeblock(self):
-        stmts = []
-        
-        while self.next().tagType != "CloseTag":
-            stmt = self.grab_statement()
-            stmts.append(stmt)
-                
-        cb = CodeBlock(statements=stmts)
-        return cb
-
     def grab_statement(self):
         if self.next().tagType == "IfTag":
             return self.grab_if()
@@ -96,6 +86,11 @@ class TekoParser:
         elif self.next().tagType in SIMPLE_EXPR_TAGTYPES:
             expr = SimpleExpression(self.next())
             self.step()
+        elif self.next().tagType == "BangTag":
+            line_number = self.next().token.line_number
+            self.step()
+            expr = self.grab_expression()
+            return NotExpression(line_number, expr)
         else:
             TekoException("Illegal start to expression: " + self.next().token.string,
                           self.next().token.line_number)
@@ -133,6 +128,8 @@ class TekoParser:
             nextnext = self.next(2)[1]
             if nextnext.tagType == "LabelTag":
                 new_expr = AttrExpression(leftexpr = expr, label = nextnext)
+                self.step()
+                self.step()
             else:
                 self.tags[self.i] = Tag("ConversionTag",self.next().token,{"conversion":"."})
 
@@ -150,8 +147,13 @@ class TekoParser:
     # this method is unsafe with regard to what type of Expression it returns
     # it may return a SequenceExpression, a CodeBlock, a NewStruct
     # or any type of Expression with (expr)
-    def grab_sequence(self):
+    def grab_sequence(self):        
+        start = self.i
         brace = self.next().vals["brace"]
+        
+        if brace == "curly" and self.codeblock_forensic():
+            return self.grab_codeblock()
+        
         line_number = self.next().token.line_number
         self.step()
         exprs = []
@@ -164,6 +166,9 @@ class TekoParser:
             if self.next().tagType == "CommaTag":
                 cont = True
                 self.step()
+            elif self.next().tagType == "LabelTag":
+                self.i = start
+                return self.grab_struct()
                 
         self.expect("CloseTag",{"brace":brace})
         if brace == "paren" and len(elems) == 1:
@@ -206,6 +211,19 @@ class TekoParser:
 
     # def grab_for
 
+    def grab_assignment(self, left):
+        setter = self.next().vals["setter"]
+        self.step()
+        right = self.grab_expression()
+        self.expect("SemicolonTag")
+
+        if setter == "=":
+            return AssignmentStatement(left, right)
+        else:
+            binop = setter[0]
+            binop_expr = BinOpExpression(binop, leftexpr = left, rightexpr = right)
+            return AssignmentStatement(left = left, right = binop_expr)
+
     def grab_declarations(self, tekotype, line_number = None):
         declarations = []
         if tekotype is not None:
@@ -245,10 +263,66 @@ class TekoParser:
         self.expect("SemicolonTag")
         return DeclarationStatement(line_number, declarations)
 
+    # the toughest node to identify is the codeblock
+    # so I needed a method to specifically look ahead and tell whether a codeblock is coming
+    def codeblock_forensic(self):
+        local_i = self.i + 0
+        assert(self.tags[local_i].tagType == "OpenTag" and self.tags[local_i].vals["brace"] == "curly")
+        local_i += 1
+
+        while self.tags[local_i].tagType != "CloseTag":
+            if self.tags[local_i].tagType == "OpenTag":
+                local_i = self.resolve_brace(local_i)
+            elif self.tags[local_i].tagType == "SemicolonTag":
+                return True # a semicolon can only occur inside a codeblock, never a list or map
+            else:
+                local_i += 1
+
+        if self.tags[local_i].vals["brace"] != "curly":
+            TekoException("mismatched braces", self.tags[local_i].token.line_number)
+
+        return False
+
+    # makes sure that braces match, and returns position after closure of start brace
+    def resolve_brace(self, local_i):
+        assert(self.tags[local_i].tagType == "OpenTag")
+        open_brace = self.tags[local_i].vals["brace"]
+        local_i += 1
+        
+        while self.tags[local_i].tagType != "CloseTag":
+            if self.tags[local_i].tagType == "OpenTag":
+                self.resolve_brace(local_i)
+            else:
+                local_i += 1
+            if local_i >= len(self.tags):
+                TekoException("Unterminated %s brace" % self.tags[local_i].vals["brace"],
+                              self.tags[local_i].token.line_number)
+                
+                
+        close_brace = self.tags[local_i].vals["brace"]
+        if open_brace != close_brace:
+            TekoException("mismatched braces", self.tags[local_i].token.line_number)
+        else:
+            return local_i + 1
+
+    def grab_codeblock(self):
+        line_number = self.next().token.line_number
+        self.expect("OpenTag", {"brace":"curly"})
+        stmts = []
+        
+        while self.next().tagType != "CloseTag":
+            stmt = self.grab_statement()
+            stmts.append(stmt)
+
+        self.expect("CloseTag", {"brace":"curly"})              
+        cb = CodeBlock(line_number=line_number, statements=stmts)
+        return cb
+
     def grab_args(self):
         self.expect("OpenTag",{"brace":"paren"})
         args = []
-        cont = True
+        cont = not (self.next().tagType == "CloseTag" and self.next().vals["brace"] == "paren") # if arglist is empty, next tag is a CloseTag )
+        
         while cont:
             cont = False
             one, two = tuple(self.next(2))
@@ -265,10 +339,40 @@ class TekoParser:
 
             if self.next().tagType == "CommaTag":
                 cont = True
+                self.step()
 
         self.expect("CloseTag",{"brace":"paren"})
         return args
 
-    # def grab_struct
+    def grab_struct(self):
+        elems = []
+        self.expect("OpenTag",{"brace":"paren"})
+        cont = True
+        while cont:
+            cont = False
+            tekotype = self.grab_expression()
+            if self.next().tagType != "LabelTag":
+                TekoException("Expected LabelTag instead of " + str(self.next()), self.next().token.line_number)
+            label = self.next()
+            self.step()
+            
+            if self.next().tagType == "QMarkTag":
+                self.step()
+                default = self.grab_expression()
+            else:
+                default = None
+
+            elem = StructElem(tekotype, label, default)
+            elems.append(elem)
+            
+            if self.next().tagType == "CommaTag":
+                cont = True
+                self.step()
+
+        self.expect("CloseTag",{"brace":"paren"})
+        struct = NewStruct(elems)
+        return struct
 
     # def grab_map
+
+    # def grab_class

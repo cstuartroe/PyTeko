@@ -27,17 +27,19 @@ class DeclarationStatement(Statement):
         self.declarations = declarations
 
     def __str__(self):
-        return "Declarations " + ", ".join([str(d) for d in self.declarations]) + ";"
+        return ", ".join([str(d) for d in self.declarations]) + ";"
 
 class AssignmentStatement(Statement):
-    def __init__(self, label, expression):
-        assert(label.tagType == "LabelTag")
-        assert(isinstance(expression, Expression))
+    def __init__(self, left, right):
+        assert(isinstance(left, Expression))
+        assert(isinstance(right, Expression))
 
-        self.label = label
-        self.expression = expression
+        self.left = left
+        self.right = right
+        self.line_number = self.left.line_number
 
-        self.line_number = self.label.token.line_number
+    def __str__(self):
+        return str(self.left) + " = (" + str(self.right) + ");"
 
 class ExpressionStatement(Statement):
     def __init__(self, expression):
@@ -93,7 +95,7 @@ class Declaration(Node):
         
         assert(tekotype is None or isinstance(tekotype, Expression))
         assert(label.tagType == "LabelTag")
-        assert(struct is None or isinstance(struct, StructExpression))
+        assert(struct is None or isinstance(struct, NewStruct))
         assert(expression is None or isinstance(expression, Expression))
 
         self.tekotype = tekotype
@@ -179,7 +181,13 @@ class AttrExpression(Expression):
         assert(isinstance(leftexpr, Expression))
         assert(label.tagType == "LabelTag")
 
+        self.leftexpr = leftexpr
+        self.label = label
+
         self.line_number = leftexpr.line_number
+
+    def __str__(self):
+        return str(self.leftexpr) + "." + self.label.vals["label"]
 
 class BinOpExpression(Expression):
     def __init__(self, binop, leftexpr, rightexpr):
@@ -196,9 +204,18 @@ class BinOpExpression(Expression):
     def __str__(self):
         return "(" + str(self.leftexpr) + " " + self.binop + " " + str(self.rightexpr) + ")"
 
+class NotExpression(Expression):
+    def __init__(self, line_number, expr):
+        super().__init__(line_number)
+        assert(isinstance(expr, Expression))
+        self.expr = expr
+
+    def __str__(self):
+        return "!(" + str(self.expr) + ")"
+
 class ComparisonExpression(Expression):
     def __init__(self, comp, leftexpr, rightexpr):
-        assert(comp in COMPARISON)
+        assert(comp in COMPARISONS)
         assert(isinstance(leftexpr, Expression))
         assert(isinstance(rightexpr, Expression))
 
@@ -207,6 +224,9 @@ class ComparisonExpression(Expression):
         self.rightexpr = rightexpr
 
         self.line_number = self.leftexpr.line_number
+
+    def __str__(self):
+        return "(" + str(self.leftexpr) + " " + self.comp + " " + str(self.rightexpr) + ")"
 
 class ConversionExpression(Expression):
     def __init__(self, leftexpr, conv):
@@ -229,7 +249,41 @@ class CodeBlock(Expression):
         assert(all(isinstance(item,Statement) for item in statements))
         self.statements = statements
 
+    def __str__(self):
+        s = "{\n"
+        for stmt in self.statements:
+            s += "    " + str(stmt) + "\n"
+        s += "}"
+        return s
+
+class NewStruct(Expression):
+    def __init__(self, elems):
+        assert(all(isinstance(elem, StructElem) for elem in elems))
+        self.elems = elems
+        self.line_number = self.elems[0].line_number
+
+    def __str__(self):
+        return "(" + ", ".join([str(elem) for elem in self.elems]) + ")"
+
 # # #
+
+class StructElem(Node):
+    def __init__(self, tekotype, label, default = None):
+        assert(isinstance(tekotype, Expression))
+        assert(label.tagType == "LabelTag")
+        assert(default is None or isinstance(default, Expression))
+
+        self.tekotype = tekotype
+        self.label = label
+        self.default = default
+
+        self.line_number = tekotype.line_number
+
+    def __str__(self):
+        s = str(self.tekotype) + " " + self.label.vals["label"]
+        if self.default:
+            s += " ? " + str(self.default)
+        return s
 
 class ArgNode(Node):
     def __init__(self, expr, kw = None):
@@ -249,4 +303,4 @@ class ArgNode(Node):
         s += str(self.expr)
         return s
 
-# TODO: MapExpression, NewStruct
+# TODO: MapExpression

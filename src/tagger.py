@@ -5,11 +5,12 @@ BINOPS = {"+","-","*","/","^","%","&&","||",":"}
 SETTERS = {"=","+=","-=","*=","/=","^=","%="}
 COMPARISONS = {"==","!=","<","<=",">",">=","<:"}
 CONVERSIONS = {".","$","[]","{}","<>"}
+VISIBLITIES = {"public","protected","private","readonly"}
 ENUM_TAGTYPES = {"OpenTag":BRACES,"CloseTag":BRACES,"SetterTag":SETTERS,
                  "ComparisonTag":COMPARISONS,"ConversionTag":CONVERSIONS}
 STATIC_TAGS = {";":"SemicolonTag",",":"CommaTag","?":"QMarkTag", #":":"ColonTag",
                "!":"BangTag","if":"IfTag","else":"ElseTag","for":"ForTag",
-               "while":"WhileTag","in":"InTag","let":"LetTag"}
+               "while":"WhileTag","in":"InTag","let":"LetTag","class":"ClassTag"}
 
 OPEN_LITERALS  = {"paren":"(","curly":"{","square":"[","angle":"<"}
 CLOSE_LITERALS = {"paren":")","curly":"}","square":"]","angle":">"}
@@ -19,6 +20,7 @@ class Tag:
                 "IntTag":{"int"}, "RealTag":{"real"},
                 "BoolTag":{"bool"}, "IfTag":set(), "ElseTag":set(),
                 "ForTag":set(),"WhileTag":set(), "InTag":set(), "LetTag":set(),
+                "ClassTag":set(), "VisibilityTag":{"visibility"},
                 "SemicolonTag":set(),"ColonTag":set(), "CommaTag":set(),
                 "QMarkTag":set(), "BangTag":set(),"DotTag":set(),
                 "OpenTag":{"brace"},"CloseTag":{"brace"},
