@@ -1,19 +1,46 @@
 from .tokenizer import is_alpha, is_num, Token
+from .general import TekoException
 
 BRACES = {"paren","curly","square","angle"}
 BINOPS = {"+","-","*","/","^","%","&&","||",":"}
 SETTERS = {"=","+=","-=","*=","/=","^=","%="}
 COMPARISONS = {"==","!=","<","<=",">",">=","<:"}
 CONVERSIONS = {".","$","[]","{}","<>"}
-VISIBLITIES = {"public","protected","private","readonly"}
+VISIBILITIES = {"public","protected","private","readonly"}
 ENUM_TAGTYPES = {"OpenTag":BRACES,"CloseTag":BRACES,"SetterTag":SETTERS,
                  "ComparisonTag":COMPARISONS,"ConversionTag":CONVERSIONS}
-STATIC_TAGS = {";":"SemicolonTag",",":"CommaTag","?":"QMarkTag", #":":"ColonTag",
+STATIC_TAGS = {";":"SemicolonTag",",":"CommaTag","?":"QMarkTag", ":":"ColonTag",
                "!":"BangTag","if":"IfTag","else":"ElseTag","for":"ForTag",
                "while":"WhileTag","in":"InTag","let":"LetTag","class":"ClassTag"}
 
 OPEN_LITERALS  = {"paren":"(","curly":"{","square":"[","angle":"<"}
 CLOSE_LITERALS = {"paren":")","curly":"}","square":"]","angle":">"}
+
+ESCAPE_SEQS = {r"\"":'"',r"\n":'\n',r"\'":"'",r"\t":'\t'}
+
+def digest_char(s, i):
+    if s[i] == "\\":
+        if s[i:i+2] in ESCAPE_SEQS:
+            c = ESCAPE_SEQS[s[i:i+2]]
+            return c, i+2
+    else:
+        return s[i], i+1
+
+# takes a string escaped according to Teko syntax, and returns the literal string it represents
+def digest_string(token):
+    escaped_s = token.string
+    assert(escaped_s[0] == '"' and escaped_s[-1] == '"')
+    
+    i = 1
+    literal_s = ""
+    while i < len(escaped_s) - 1:
+        try:
+            c, i = digest_char(escaped_s, i)
+        except BaseException:
+            TekoException("Error while parsing string",token.line_number)
+        literal_s += c
+
+    return literal_s
 
 class Tag:
     tagTypes = {"LabelTag":{"label"}, "StringTag":{"string"},
@@ -72,6 +99,11 @@ def get_tags(tokens):
         
         if s in STATIC_TAGS: yield Tag(STATIC_TAGS[s],token)
 
+        elif s == "public":    yield Tag("VisibilityTag",token,{"visibility":s})
+        elif s == "protected": yield Tag("VisibilityTag",token,{"visibility":s})
+        elif s == "private":   yield Tag("VisibilityTag",token,{"visibility":s})
+        elif s == "readonly":  yield Tag("VisibilityTag",token,{"visibility":s})
+
         elif s == "(": yield Tag("OpenTag",token,{"brace":"paren"})
         elif s == ")": yield Tag("CloseTag",token,{"brace":"paren"})
         elif s == "{": yield Tag("OpenTag",token,{"brace":"curly"})
@@ -90,7 +122,7 @@ def get_tags(tokens):
         elif s == "true": yield Tag("BoolTag",token,{"bool":True})
         elif s == "false": yield Tag("BoolTag",token,{"bool":False})
 
-        elif s[0] == '"': yield Tag("StringTag",token,{"string":s})
+        elif s[0] == '"': yield Tag("StringTag",token,{"string":digest_string(token)})
         elif is_alpha(s[0]): yield Tag("LabelTag",token,{"label":s})
         elif is_num(s[0]):
             if "." in s:

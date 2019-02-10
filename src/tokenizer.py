@@ -103,7 +103,8 @@ class Tokenizer:
                     TekoException("EOF while parsing string", self.line_number)
                 token_string += c
                 self.i += 1
-                
+
+        token_string += '"'
         self.i += 1
 
         token = Token(string=token_string, position=start, line_number = self.line_number)

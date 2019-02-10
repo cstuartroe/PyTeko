@@ -1,4 +1,4 @@
-from .tagger import BRACES, BINOPS, COMPARISONS, CONVERSIONS, OPEN_LITERALS, CLOSE_LITERALS
+from .tagger import BRACES, BINOPS, COMPARISONS, CONVERSIONS, OPEN_LITERALS, CLOSE_LITERALS, VISIBILITIES
 
 SIMPLE_EXPR_TAGTYPES = {"IntTag", "RealTag", "BoolTag",
                         "StringTag", "LabelTag"}
@@ -97,6 +97,32 @@ class ForBlock(Statement):
         self.iterable = iterable
         self.codeblock = codeblock
 
+    def __str__(self):
+        s = "for (" + str(self.tekotype) + " " + str(self.label)
+        s += " in " + str(self.iterable) + ") " + str(self.codeblock)
+        return s
+
+class ClassDeclaration(Statement):
+    def __init__(self, line_number, label, declaration_dict):
+        super().__init__(line_number)
+
+        assert(label.tagType == "LabelTag")
+        for vis, decs in declaration_dict.items():
+            assert(vis in VISIBILITIES)
+            assert(all(isinstance(dec, DeclarationStatement) for dec in decs))
+
+        self.label = label
+        self.declaration_dict = declaration_dict
+
+    def __str__(self):
+        s = "class " + self.label.vals["label"] + " {\n"
+        for vis, decs in self.declaration_dict.items():
+            s += vis + ": \n"
+            for dec in decs:
+                s += "\t" + str(dec) + "\n"
+        s += "}"
+        return s
+
 # # #
 
 class Declaration(Node):
@@ -152,7 +178,10 @@ class SimpleExpression(Expression):
         self.line_number = self.tag.token.line_number
 
     def __str__(self):
-        return str(self.tag.only_val())
+        if self.tag.tagType in ["StringTag", "BoolTag"]:
+            return self.tag.token.string
+        else:
+            return str(self.tag.only_val())
 
 class SequenceExpression(Expression):
     def __init__(self, line_number, brace, exprs):
@@ -267,10 +296,11 @@ class CodeBlock(Expression):
         return s
 
 class NewStruct(Expression):
-    def __init__(self, elems):
+    def __init__(self, line_number, elems):
+        super().__init__(line_number)
+        
         assert(all(isinstance(elem, StructElem) for elem in elems))
         self.elems = elems
-        self.line_number = self.elems[0].line_number
 
     def __str__(self):
         return "(" + ", ".join([str(elem) for elem in self.elems]) + ")"

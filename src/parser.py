@@ -1,10 +1,8 @@
-from collections import namedtuple
-
 from .general import TekoException
 from .tokenizer import Tokenizer, Token
 from .tagger import *
 from .types import *
-from .parsenode import*
+from .parsenode import *
 
 class Precedence:
     COMPARE  = 0
@@ -17,6 +15,8 @@ class Precedence:
                    "*":MULT_DIV, "/":MULT_DIV,
                    "%":MULT_DIV, "^":EXP,
                    ":":EXP}
+
+EMPTY_SEQUENCES = {"{}":"curly","[]":"square","<>":"angle"}
 
 class TekoParser:
     def __init__(self, filename):
@@ -64,6 +64,8 @@ class TekoParser:
             return self.grab_for()
         elif self.next().tagType == "WhileTag":
             return self.grab_while()
+        elif self.next().tagType == "ClassTag":
+            return self.grab_class()
         elif self.next().tagType == "LetTag":
             line_number = self.next().token.line_number
             self.step()
@@ -91,6 +93,11 @@ class TekoParser:
             self.step()
             expr = self.grab_expression()
             return NotExpression(line_number, expr)
+        elif self.next().tagType == "ConversionTag" and self.next().vals["conversion"] in ["{}","[]","<>"]:
+            brace = EMPTY_SEQUENCES[self.next().vals["conversion"]]
+            line_number = self.next().token.line_number
+            expr = SequenceExpression(line_number, brace, [])
+            self.step()
         else:
             TekoException("Illegal start to expression: " + self.next().token.string,
                           self.next().token.line_number)
@@ -99,6 +106,28 @@ class TekoParser:
 
     def check_postfix(self, expr, prec):
         new_expr = None
+
+        # some tokens have ambiguous syntactic function, which can only be determined during parsing:
+
+        if self.next().tagType == "DotTag":
+            nextnext = self.next(2)[1]
+            if nextnext.tagType == "LabelTag":
+                new_expr = AttrExpression(leftexpr = expr, label = nextnext)
+                self.step()
+                self.step()
+            else:
+                self.tags[self.i] = Tag("ConversionTag",self.next().token,{"conversion":"."})
+
+        if self.next().tagType == "ColonTag":
+            self.tags[self.i] = Tag("BinOpTag",self.next().token,{"binop":":"})
+
+        if self.next().tagType == "LAngleTag":
+            self.tags[self.i] = Tag("ComparisonTag",self.next().token,{"comparison":"<"})
+
+        if self.next().tagType == "RAngleTag":
+            self.tags[self.i] = Tag("ComparisonTag",self.next().token,{"comparison":">"})
+
+        # this is actual postfix checking:
         
         if self.next().tagType == "BinOpTag":
             binop = self.next().vals["binop"]
@@ -110,7 +139,7 @@ class TekoParser:
             else:
                 return expr
 
-        if self.next().tagType == "ComparisonTag":
+        elif self.next().tagType == "ComparisonTag":
             comp = self.next().vals["comparison"]
             new_prec = Precedence.COMPARE
             if new_prec > prec:
@@ -120,20 +149,11 @@ class TekoParser:
             else:
                 return expr
 
-        if self.next().tagType == "OpenTag" and self.next().vals["brace"] == "paren":
+        elif self.next().tagType == "OpenTag" and self.next().vals["brace"] == "paren":
             args = self.grab_args()
             new_expr = CallExpression(leftexpr = expr, args = args)
 
-        if self.next().tagType == "DotTag":
-            nextnext = self.next(2)[1]
-            if nextnext.tagType == "LabelTag":
-                new_expr = AttrExpression(leftexpr = expr, label = nextnext)
-                self.step()
-                self.step()
-            else:
-                self.tags[self.i] = Tag("ConversionTag",self.next().token,{"conversion":"."})
-
-        if self.next().tagType == "ConversionTag":
+        elif self.next().tagType == "ConversionTag":
             conv = self.next().vals["conversion"]
             self.step()
             new_expr = ConversionExpression(leftexpr = expr, conv = conv)
@@ -158,7 +178,7 @@ class TekoParser:
         self.step()
         exprs = []
         
-        cont = True
+        cont = (self.next().tagType != "CloseTag")
         while cont:
             cont = False
             expr = self.grab_expression()
@@ -171,7 +191,7 @@ class TekoParser:
                 return self.grab_struct()
                 
         self.expect("CloseTag",{"brace":brace})
-        if brace == "paren" and len(elems) == 1:
+        if brace == "paren" and len(exprs) == 1:
             return exprs[0]
         else:
             return SequenceExpression(line_number, brace, exprs)
@@ -211,7 +231,24 @@ class TekoParser:
 
         return WhileBlock(line_number, cond, cb)        
 
-    # def grab_for
+    def grab_for(self):
+        line_number = self.next().token.line_number
+
+        self.expect("ForTag")
+        self.expect("OpenTag",{"brace":"paren"})
+
+        tekotype = self.grab_expression()
+        if self.next().tagType != "LabelTag":
+            TekoException("Expecting a label",self.next().token.line_number)
+        label = self.next()
+        self.step()
+        self.expect("InTag")
+        iterable = self.grab_expression()
+        self.expect("CloseTag",{"brace":"paren"})
+
+        cb = self.grab_codeblock()
+
+        return ForBlock(line_number, tekotype, label, iterable, cb)
 
     def grab_assignment(self, left):
         setter = self.next().vals["setter"]
@@ -348,8 +385,9 @@ class TekoParser:
 
     def grab_struct(self):
         elems = []
+        line_number = self.next().token.line_number
         self.expect("OpenTag",{"brace":"paren"})
-        cont = True
+        cont = (self.next().tagType != "CloseTag")
         while cont:
             cont = False
             tekotype = self.grab_expression()
@@ -372,9 +410,41 @@ class TekoParser:
                 self.step()
 
         self.expect("CloseTag",{"brace":"paren"})
-        struct = NewStruct(elems)
+        struct = NewStruct(line_number, elems)
         return struct
 
     # def grab_map
 
-    # def grab_class
+    def grab_class(self):
+        line_number = self.next().token.line_number
+        self.expect("ClassTag")
+        classname = self.next()
+        self.step()
+        self.expect("OpenTag",{"brace":"curly"})
+        
+        current_vis = "protected" # default visibility level
+        vis_sections = []
+        declaration_dict = {}
+
+        while self.next().tagType != "CloseTag":
+            if self.next().tagType == "VisibilityTag":
+                vis = self.next().vals["visibility"]
+                if vis in vis_sections:
+                    TekoException("Two %s visibility sections in class %s" % (vis, classname.vals["label"]), self.next().token.line_number)
+                current_vis = vis
+                vis_sections.append(vis)
+                self.step()
+                self.expect("ColonTag")
+            else:
+                if self.next().tagType == "LetTag":
+                    tekotype = None
+                    dec_line_number = self.next().token.line_number
+                    self.step()
+                else:
+                    tekotype = self.grab_expression()
+                    dec_line_number = None
+                dec = self.grab_declarations(tekotype, dec_line_number)
+                declaration_dict[current_vis] = declaration_dict.get(current_vis,[]) + [dec]
+
+        self.expect("CloseTag",{"brace":"curly"})
+        return ClassDeclaration(line_number, classname, declaration_dict)
