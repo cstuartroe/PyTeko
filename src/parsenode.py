@@ -1,4 +1,4 @@
-from .tagger import BRACES, BINOPS, COMPARISONS, CONVERSIONS
+from .tagger import BRACES, BINOPS, COMPARISONS, CONVERSIONS, OPEN_LITERALS, CLOSE_LITERALS
 
 SIMPLE_EXPR_TAGTYPES = {"IntTag", "RealTag", "BoolTag",
                         "StringTag", "LabelTag"}
@@ -24,7 +24,10 @@ class DeclarationStatement(Statement):
 
         assert(type(declarations) == list)
         assert(all(isinstance(item,Declaration) for item in declarations))
-        self.declaration = declarations
+        self.declarations = declarations
+
+    def __str__(self):
+        return "Declarations " + ", ".join([str(d) for d in self.declarations]) + ";"
 
 class AssignmentStatement(Statement):
     def __init__(self, label, expression):
@@ -42,6 +45,9 @@ class ExpressionStatement(Statement):
         self.expression = expression
 
         self.line_number = self.expression.line_number
+
+    def __str__(self):
+        return str(self.expression) + ";"
 
 class IfStatement(Statement):
     def __init__(self, line_number, condition, codeblock, else_stmt):
@@ -82,8 +88,10 @@ class ForBlock(Statement):
 # # #
 
 class Declaration(Node):
-    def __init__(self, tekotype, label, struct=None, expression=None):
-        assert(isinstance(tekotype, Expression))
+    def __init__(self, line_number, tekotype, label, struct=None, expression=None):
+        super().__init__(line_number)
+        
+        assert(tekotype is None or isinstance(tekotype, Expression))
         assert(label.tagType == "LabelTag")
         assert(struct is None or isinstance(struct, StructExpression))
         assert(expression is None or isinstance(expression, Expression))
@@ -93,7 +101,17 @@ class Declaration(Node):
         self.struct = struct
         self.expression = expression
 
-        self.line_number = self.tekotype.line_number
+    def __str__(self):
+        if self.tekotype:
+            s = str(self.tekotype)
+        else:
+            s = "let"
+        s += " " + self.label.vals["label"]
+        if self.struct is not None:
+            s += str(self.struct)
+        if self.expression is not None:
+            s += " = " + str(self.expression)
+        return s
 
 class Assignment(Node):
     def __init__(self, label, expression=None):
@@ -121,22 +139,40 @@ class SimpleExpression(Expression):
 
         self.line_number = self.tag.token.line_number
 
+    def __str__(self):
+        return str(self.tag.only_val())
+
 class SequenceExpression(Expression):
     def __init__(self, line_number, brace, exprs):
         super().__init__(line_number)
 
         assert(brace in BRACES)
-        assert(all(isinstance(expr) for expr in exprs))
+        assert(all(isinstance(expr, Expression) for expr in exprs))
 
         self.brace = brace
         self.exprs = exprs
+
+    def __str__(self):
+        s = OPEN_LITERALS[self.brace]
+        s += ", ".join([str(expr) for expr in self.exprs])
+        s += CLOSE_LITERALS[self.brace]
+        return s
 
 class CallExpression(Expression):
     def __init__(self, leftexpr, args):
         assert(isinstance(leftexpr, Expression))
         assert(isinstance(arg, ArgNode) for arg in args)
 
+        self.leftexpr = leftexpr
+        self.args = args
+
         self.line_number = leftexpr.line_number
+
+    def __str__(self):
+        s = str(self.leftexpr) + "("
+        s += ", ".join([str(arg) for arg in self.args])
+        s += ")"
+        return s
 
 class AttrExpression(Expression):
     def __init__(self, leftexpr, label):
@@ -156,6 +192,9 @@ class BinOpExpression(Expression):
         self.rightexpr = rightexpr
 
         self.line_number = self.leftexpr.line_number
+
+    def __str__(self):
+        return "(" + str(self.leftexpr) + " " + self.binop + " " + str(self.rightexpr) + ")"
 
 class ComparisonExpression(Expression):
     def __init__(self, comp, leftexpr, rightexpr):
@@ -179,6 +218,9 @@ class ConversionExpression(Expression):
 
         self.line_number = leftexpr.line_number
 
+    def __str__(self):
+        return str(self.leftexpr) + self.conv
+
 class CodeBlock(Expression):
     def __init__(self, line_number, statements):
         super().__init__(line_number)
@@ -187,4 +229,24 @@ class CodeBlock(Expression):
         assert(all(isinstance(item,Statement) for item in statements))
         self.statements = statements
 
-# TODO: MapExpression, ArgNode, NewStruct
+# # #
+
+class ArgNode(Node):
+    def __init__(self, expr, kw = None):
+        assert(isinstance(expr, Expression))
+        assert(kw is None or kw.tagType == "LabelTag")
+
+        self.expr = expr
+        self.kw = kw
+
+        self.line_number = self.kw.token.line_number if self.kw else self.expr.line_number
+
+    def __str__(self):
+        if self.kw:
+            s = self.kw.vals["label"] + " = "
+        else:
+            s = ""
+        s += str(self.expr)
+        return s
+
+# TODO: MapExpression, NewStruct

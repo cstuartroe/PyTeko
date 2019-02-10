@@ -13,8 +13,10 @@ class Precedence:
     EXP      = 3
 
     BINOP_PRECS = {"+":ADD_SUB,  "-":ADD_SUB,
+                   "&&":ADD_SUB, "||":ADD_SUB,
                    "*":MULT_DIV, "/":MULT_DIV,
-                   "%":MULT_DIV, "^":EXP}
+                   "%":MULT_DIV, "^":EXP,
+                   ":":EXP}
 
 class TekoParser:
     def __init__(self, filename):
@@ -25,13 +27,12 @@ class TekoParser:
         tokens = tk.tokenize(source)
         
         self.tags = list(get_tags(tokens))
-        #self.tags = [Tag("OpenTag",{"brace":"curly"})] + list(tags) + [Tag("CloseTag",{"brace":"curly"})]
-
+        
     def more(self):
         return self.i < len(self.tags)
 
     def step(self):
-        print(self.next().token.string)
+        #print(self.next().token.string)
         self.i += 1
 
     def next(self,n=1):
@@ -53,12 +54,13 @@ class TekoParser:
 
     def parse(self):
         self.i = 0
-        cb = self.grab_codeblock()
-        return cb
+        while self.more():
+            yield self.grab_statement()
 
     def grab_codeblock(self):
         stmts = []
-        while self.i < len(self.tags) and self.next().tagType != "CloseTag":
+        
+        while self.next().tagType != "CloseTag":
             stmt = self.grab_statement()
             stmts.append(stmt)
                 
@@ -75,7 +77,7 @@ class TekoParser:
         elif self.next().tagType == "LetTag":
             line_number = self.next().token.line_number
             self.step()
-            return self.grab_declaration(tekotype = None, line_number = line_number)
+            return self.grab_declarations(tekotype = None, line_number = line_number)
 
         expr = self.grab_expression()
         
@@ -84,7 +86,9 @@ class TekoParser:
         elif self.next().tagType == "LabelTag":
             return self.grab_declarations(tekotype = expr)
         else:
-            return ExpressionStatement(expression=expr)
+            expr_stmt = ExpressionStatement(expression=expr)
+            self.expect("SemicolonTag")
+            return expr_stmt
 
     def grab_expression(self, prec = -1):
         if self.next().tagType == "OpenTag":
@@ -122,10 +126,7 @@ class TekoParser:
                 return expr
 
         if self.next().tagType == "OpenTag" and self.next().vals["brace"] == "paren":
-            self.step()
             args = self.grab_args()
-            self.expect("CloseTag",{"brace":"paren"})
-
             new_expr = CallExpression(leftexpr = expr, args = args)
 
         if self.next().tagType == "DotTag":
@@ -141,13 +142,34 @@ class TekoParser:
             new_expr = ConversionExpression(leftexpr = expr, conv = conv)
 
         if not new_expr:
+            # print(expr)
             return expr
 
         return self.check_postfix(new_expr, prec)
 
+    # this method is unsafe with regard to what type of Expression it returns
+    # it may return a SequenceExpression, a CodeBlock, a NewStruct
+    # or any type of Expression with (expr)
     def grab_sequence(self):
         brace = self.next().vals["brace"]
+        line_number = self.next().token.line_number
         self.step()
+        exprs = []
+        
+        cont = True
+        while cont:
+            cont = False
+            expr = self.grab_expression()
+            exprs.append(expr)
+            if self.next().tagType == "CommaTag":
+                cont = True
+                self.step()
+                
+        self.expect("CloseTag",{"brace":brace})
+        if brace == "paren" and len(elems) == 1:
+            return exprs[0]
+        else:
+            return SequenceExpression(line_number, brace, exprs)
         
     def grab_if(self):
         line_number = self.next().token.line_number
@@ -180,6 +202,10 @@ class TekoParser:
 
         return IfStatement(line_number = line_number, condition = cond, codeblock = cb, else_stmt = else_stmt)
 
+    # def grab_while
+
+    # def grab_for
+
     def grab_declarations(self, tekotype, line_number = None):
         declarations = []
         if tekotype is not None:
@@ -209,7 +235,7 @@ class TekoParser:
             else:
                 expr = None
 
-            declaration = Declaration(tekotype, label, struct, expr)
+            declaration = Declaration(line_number, tekotype, label, struct, expr)
             declarations.append(declaration)
 
             if self.next().tagType == "CommaTag":
@@ -218,3 +244,31 @@ class TekoParser:
 
         self.expect("SemicolonTag")
         return DeclarationStatement(line_number, declarations)
+
+    def grab_args(self):
+        self.expect("OpenTag",{"brace":"paren"})
+        args = []
+        cont = True
+        while cont:
+            cont = False
+            one, two = tuple(self.next(2))
+            if one.tagType == "LabelTag" and two.tagType == "SetterTag" and two.vals["setter"] == "=":
+                self.step()
+                self.step()
+                kw = one
+            else:
+                kw = None
+
+            expr = self.grab_expression()
+            arg = ArgNode(expr, kw)
+            args.append(arg)
+
+            if self.next().tagType == "CommaTag":
+                cont = True
+
+        self.expect("CloseTag",{"brace":"paren"})
+        return args
+
+    # def grab_struct
+
+    # def grab_map

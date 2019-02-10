@@ -1,15 +1,18 @@
 from .tokenizer import is_alpha, is_num, Token
 
 BRACES = {"paren","curly","square","angle"}
-BINOPS = {"+","-","*","/","^","%","&&","||"}
+BINOPS = {"+","-","*","/","^","%","&&","||",":"}
 SETTERS = {"=","+=","-=","*=","/=","^=","%="}
 COMPARISONS = {"==","!=","<","<=",">",">=","<:"}
 CONVERSIONS = {".","$","[]","{}","<>"}
 ENUM_TAGTYPES = {"OpenTag":BRACES,"CloseTag":BRACES,"SetterTag":SETTERS,
                  "ComparisonTag":COMPARISONS,"ConversionTag":CONVERSIONS}
-STATIC_TAGS = {";":"SemicolonTag",":":"ColonTag",",":"CommaTag","?":"QMarkTag",
+STATIC_TAGS = {";":"SemicolonTag",",":"CommaTag","?":"QMarkTag", #":":"ColonTag",
                "!":"BangTag","if":"IfTag","else":"ElseTag","for":"ForTag",
                "while":"WhileTag","in":"InTag","let":"LetTag"}
+
+OPEN_LITERALS  = {"paren":"(","curly":"{","square":"[","angle":"<"}
+CLOSE_LITERALS = {"paren":")","curly":"}","square":"]","angle":">"}
 
 class Tag:
     tagTypes = {"LabelTag":{"label"}, "StringTag":{"string"},
@@ -48,17 +51,9 @@ class Tag:
         elif self.tagType == "StringTag":
             s = '"%s"' % self.vals["string"]
         elif self.tagType == "OpenTag":
-            brace = self.vals["brace"]
-            if brace == "paren": s = "("
-            elif brace == "curly": s = "{"
-            elif brace == "square": s = "["
-            elif brace == "angle": s = "<"
+            s = OPEN_LITERALS[ self.vals["brace"] ]
         elif self.tagType == "CloseTag":
-            brace = self.vals["brace"]
-            if brace == "paren": s = ")"
-            elif brace == "curly": s = "}"
-            elif brace == "square": s = "]"
-            elif brace == "angle": s = ">"
+            s = CLOSE_LITERALS[ self.vals["brace"] ]
         else:
             s = ""
         return "<" + self.tagType + " " + s + " >"

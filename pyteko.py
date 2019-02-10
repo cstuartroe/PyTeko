@@ -10,8 +10,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
         
     tp = TekoParser(args.file)
-    cb = tp.parse()
-    for stmt in cb.statements:
-        print()
-        for tag in stmt:
-            print(tag)
+    for stmt in tp.parse():
+        print(stmt)
