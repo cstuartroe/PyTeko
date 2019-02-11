@@ -1,7 +1,7 @@
 from .general import TekoException
 from .tokenizer import Tokenizer, Token
 from .tagger import *
-from .types import *
+#from .primitives import *
 from .parsenode import *
 
 class Precedence:
