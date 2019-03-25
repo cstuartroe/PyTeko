@@ -71,7 +71,12 @@ class TekoFunction(TekoObject):
 
     def exec(self, args):
         si = TekoStructInstance(self.tekotype.arg_struct, args)
-        return self.interpret(si)
+        returnval = self.interpret(si)
+        if self.tekotype.return_type is None:
+            assert(returnval is None)
+        else:
+            assert(isTekoInstance(returnval, self.tekotype.return_type))
+        return returnval
 
     def interpret(self, si):
         ti = TekoInterpreter(self.ns)
@@ -88,19 +93,24 @@ class TekoString(TekoObject):
         assert(type(s) == str)
         super().__init__(TekoStringType, name = s)
         self._strval = s
+        self.declare("_val", TekoStringType, self)
+        self.declare("_add", TekoStringBinopType, TekoStringAdd(str_ns = self.ns))
 
     def __repr__(self):
         return '<str :: %s>' % self._strval.__repr__()
 
-TekoIntType = TekoObject(TekoType, name="int")
+TekoStringBinopType = TekoFunctionType(TekoStringType, TekoNewStruct([TekoStructElem(TekoStringType,"other")]))
 
-TekoIntAddType = TekoFunctionType(TekoIntType, TekoNewStruct([TekoStructElem(TekoIntType,"other")]))
-class TekoIntAdd(TekoFunction):
-    def __init__(self, int_ns):
-        super().__init__(TekoIntAddType, codeblock=None, outer_ns=int_ns)
+class TekoStringAdd(TekoFunction):
+    def __init__(self, str_ns):
+        super().__init__(TekoStringBinopType, codeblock=None, outer_ns=str_ns)
 
     def interpret(self, si):
-        return TekoInt(self.ns.get("_val")._intval + si.get_by_label("other")._intval)
+        return TekoString(self.ns.get("_val")._strval + si.get_by_label("other")._strval)
+
+###
+
+TekoIntType = TekoObject(TekoType, name="int")
 
 class TekoInt(TekoObject):
     def __init__(self, n):
@@ -108,23 +118,79 @@ class TekoInt(TekoObject):
         super().__init__(TekoIntType, name = str(n))
         self._intval = n
         self.declare("_val", TekoIntType, self)
-        self.declare("_add", TekoIntAddType, TekoIntAdd(int_ns = self.ns))
+        self.declare("_add", TekoIntBinopType, TekoIntBinop(int_ns = self.ns, op = "__add__"))
+        self.declare("_sub", TekoIntBinopType, TekoIntBinop(int_ns = self.ns, op = "__sub__"))
+        self.declare("_mul", TekoIntBinopType, TekoIntBinop(int_ns = self.ns, op = "__mul__"))
+        self.declare("_div", TekoIntBinopType, TekoIntBinop(int_ns = self.ns, op = "__floordiv__"))
+        self.declare("_exp", TekoIntBinopType, TekoIntBinop(int_ns = self.ns, op = "__pow__"))
+        self.declare("_mod", TekoIntBinopType, TekoIntBinop(int_ns = self.ns, op = "__mod__"))
+
+TekoIntBinopType = TekoFunctionType(TekoIntType, TekoNewStruct([TekoStructElem(TekoIntType,"other")]))
+
+class TekoIntBinop(TekoFunction):
+    def __init__(self, int_ns, op):
+        super().__init__(TekoIntBinopType, codeblock=None, outer_ns=int_ns)
+        self.op = op
+        
+    def interpret(self, si):
+        leftint = self.ns.get("_val")._intval
+        rightint = si.get_by_label("other")._intval
+        return TekoInt(getattr(leftint,self.op)(rightint))
+
+###
 
 TekoRealType = TekoObject(TekoType, name="real")
 
 class TekoReal(TekoObject):
     def __init__(self, x):
         assert(type(x) == float)
-        super().__init__(TekoRealType, name = str(x))        
-        self._realval = x 
+        super().__init__(TekoRealType, name = str(x))
+        self._realval = x
+        self.declare("_val", TekoRealType, self)
+        self.declare("_add", TekoRealBinopType, TekoRealBinop(real_ns = self.ns, op = "__add__"))
+        self.declare("_sub", TekoRealBinopType, TekoRealBinop(real_ns = self.ns, op = "__sub__"))
+        self.declare("_mul", TekoRealBinopType, TekoRealBinop(real_ns = self.ns, op = "__mul__"))
+        self.declare("_div", TekoRealBinopType, TekoRealBinop(real_ns = self.ns, op = "__truediv__"))
+        self.declare("_exp", TekoRealBinopType, TekoRealBinop(real_ns = self.ns, op = "__pow__"))
+
+TekoRealBinopType = TekoFunctionType(TekoRealType, TekoNewStruct([TekoStructElem(TekoRealType,"other")]))
+
+class TekoRealBinop(TekoFunction):
+    def __init__(self, real_ns, op):
+        super().__init__(TekoRealBinopType, codeblock=None, outer_ns=real_ns)
+        self.op = op
+        
+    def interpret(self, si):
+        leftreal = self.ns.get("_val")._realval
+        rightreal = si.get_by_label("other")._realval
+        return TekoReal(getattr(leftreal,self.op)(rightreal))
+
+###
 
 TekoBoolType = TekoObject(TekoType, name="bool")
 
 class TekoBool(TekoObject):
     def __init__(self, b):
         assert(type(b) == bool)
-        super().__init__(TekoBoolType, name = str(b))
+        super().__init__(TekoBoolType, name = str(b).lower())
         self._boolval = b
+        self.declare("_val", TekoBoolType, self)
+        self.declare("_and", TekoBoolBinopType, TekoRealBinop(bool_ns = self.ns, op = "__and__"))
+        self.declare("_or",  TekoBoolBinopType, TekoRealBinop(bool_ns = self.ns, op = "__or__"))
+
+TekoBoolBinopType = TekoFunctionType(TekoBoolType, TekoNewStruct([TekoStructElem(TekoBoolType,"other")]))
+
+class TekoBoolBinop(TekoFunction):
+    def __init__(self, bool_ns, op):
+        super().__init__(TekoBoolBinopType, codeblock=None, outer_ns=bool_ns)
+        self.op = op
+        
+    def interpret(self, si):
+        leftbool = self.ns.get("_val")._boolval
+        rightbool = si.get_by_label("other")._boolval
+        return TekoBool(getattr(leftbool,self.op)(rightbool))
+
+###
 
 TekoPrintType = TekoFunctionType(None, TekoNewStruct([TekoStructElem(TekoObjectType,"arg")]))
 class TekoPrint(TekoFunction):
@@ -135,6 +201,8 @@ class TekoPrint(TekoFunction):
         print(str(si.get_by_label("arg")))
         return None
 TekoPrint = TekoPrint()
+
+###
 
 class StandardNS(Namespace):
     def __init__(self):

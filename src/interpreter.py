@@ -104,8 +104,22 @@ class TekoInterpreter:
 
         if binop_expr.binop == "+":
             returnval = leftval.get("_add").exec([rightval])
-        else:
-            raise RuntimeError("Not yet implemented!")
+        elif binop_expr.binop == "-":
+            returnval = leftval.get("_sub").exec([rightval])
+        elif binop_expr.binop == "*":
+            returnval = leftval.get("_mul").exec([rightval])
+        elif binop_expr.binop == "/":
+            returnval = leftval.get("_div").exec([rightval])
+        elif binop_expr.binop == "^":
+            returnval = leftval.get("_exp").exec([rightval])
+        elif binop_expr.binop == "%":
+            returnval = leftval.get("_mod").exec([rightval])
+        elif binop_expr.binop == "&&":
+            returnval = leftval.get("_and").exec([rightval])
+        elif binop_expr.binop == "||":
+            returnval = leftval.get("_or").exec([rightval])
+        elif binop_expr.binop == ":":
+            returnval = leftval.get("_link").exec([rightval])
 
         assert(returnval.tekotype == leftval.tekotype)
         return returnval

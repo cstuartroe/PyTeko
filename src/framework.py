@@ -1,4 +1,5 @@
 from .parsenode import *
+from .general import *
 
 class Variable:
     def __init__(self, tekotype, val=None):
@@ -87,7 +88,7 @@ class TekoObject:
     def get(self,label,default=THROW_ERROR):
         if self.ns.is_free(label):
             if default is THROW_ERROR:
-                raise RuntimeError("No default specified")
+                raise AttributeError(str(self) + " has no attribute " + label)
             else:
                 return default
         else:
