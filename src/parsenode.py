@@ -295,7 +295,7 @@ class CodeBlock(Expression):
         s += "}"
         return s
 
-class NewStruct(Expression):
+class NewStructNode(Expression):
     def __init__(self, line_number, elems):
         super().__init__(line_number)
         
@@ -307,7 +307,7 @@ class NewStruct(Expression):
 
 # # #
 
-class StructElem(Node):
+class StructElemNode(Node):
     def __init__(self, tekotype, label, default = None):
         assert(isinstance(tekotype, Expression))
         assert(label.tagType == "LabelTag")

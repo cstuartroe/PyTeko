@@ -1,5 +1,3 @@
-from .parsenode import *
-from .framework import *
 from .primitives import *
 
 class TekoInterpreter:
@@ -20,7 +18,7 @@ class TekoInterpreter:
                      ComparisonExpression: "eval_comp_expr",
                      ConversionExpression: "eval_conv_expr",
                      CodeBlock:            "eval_codeblock",
-                     NewStruct:            "eval_new_struct"}
+                     NewStructNode:        "eval_new_struct"}
     
     def __init__(self, base_ns = StandardNS()):
         self.ns = Namespace(base_ns)
@@ -81,6 +79,9 @@ class TekoInterpreter:
         else:
             raise RuntimeError("Unknown tagType: " + tag.tagType)
 
+    def eval_seq_expr(self, seq_expr):
+        raise RuntimeError("Not yet implemented!")
+
     def eval_call_expr(self, call_expr):
         left = self.eval_expression(call_expr.leftexpr)
         assert(isinstance(left.tekotype, TekoFunctionType))
@@ -91,3 +92,40 @@ class TekoInterpreter:
             evaluated_args.append(arg)
 
         left.exec(evaluated_args)
+
+    def eval_attr_expr(self, attr_expr):
+        raise RuntimeError("Not yet implemented!")
+
+    def eval_binop_expr(self, binop_expr):
+        leftval  = self.eval_expression(binop_expr.leftexpr)
+        rightval = self.eval_expression(binop_expr.rightexpr)
+        if not isTekoInstance(rightval, leftval.tekotype):
+            TekoException("Incompatible types for binary operation: %s, %s" % (leftval.tekotype, rightval.tekotype), binop_expr.line_number)
+
+        if binop_expr.binop == "+":
+            returnval = leftval.get("_add").exec([rightval])
+        else:
+            raise RuntimeError("Not yet implemented!")
+
+        assert(returnval.tekotype == leftval.tekotype)
+        return returnval
+
+    def eval_not_expr(self, not_expr):
+        raise RuntimeError("Not yet implemented!")
+
+    def eval_comp_expr(self, comp_expr):
+        raise RuntimeError("Not yet implemented!")
+    
+    def eval_conv_expr(self, conv_expr):
+        evaluated_expr = self.eval_expression(conv_expr.leftexpr)
+        
+        if conv_expr.conv == "$":
+            return TekoString(str(evaluated_expr))
+        else:
+            raise RuntimeError("Not yet implemented!")
+
+    def eval_codeblock(self, codeblock):
+        raise RuntimeError("Not yet implemented!")
+
+    def eval_new_struct(self, new_struct):
+        raise RuntimeError("Not yet implemented!")
