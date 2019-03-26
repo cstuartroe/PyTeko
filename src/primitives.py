@@ -16,6 +16,12 @@ class TekoStructElem:
         self.label = label
         self.default = default
 
+    def __str__(self):
+        s = str(self.tekotype) + " " + self.label
+        if self.default:
+            s += " ? " + str(self.default)
+        return s
+
 class TekoNewStruct(TekoObject):
     def __init__(self, struct_elems):
         super().__init__(TekoStructType)
@@ -24,6 +30,9 @@ class TekoNewStruct(TekoObject):
         for struct_elem in struct_elems:
             assert(type(struct_elem) == TekoStructElem)
             self.struct_elems.append(struct_elem)
+
+    def __str__(self):
+        return "(%s)" % ", ".join([str(e) for e in self.struct_elems])
 
 class TekoStructInstance(TekoObject):
     def __init__(self, new_struct, args):
@@ -49,14 +58,19 @@ class TekoStructInstance(TekoObject):
                 return v
 
 ###
+            
+TekoVoidType   = TekoObject(TekoType, name="void")
+TekoVoid       = TekoObject(TekoVoidType)
 
 class TekoFunctionType(TekoObject):
     def __init__(self, return_type, arg_struct):
-        assert(return_type is None or isTekoType(return_type))
+        assert(isTekoType(return_type))
         assert(isinstance(arg_struct, TekoNewStruct))
         super().__init__(TekoType)
         self.return_type = return_type
         self.arg_struct = arg_struct
+        self.declare("_args",TekoStructType,self.arg_struct)
+        self.declare("_rtype",TekoType,self.return_type)
 
     def __str__(self):
         return str(self.return_type) + str(self.arg_struct)
@@ -72,10 +86,7 @@ class TekoFunction(TekoObject):
     def exec(self, args):
         si = TekoStructInstance(self.tekotype.arg_struct, args)
         returnval = self.interpret(si)
-        if self.tekotype.return_type is None:
-            assert(returnval is None)
-        else:
-            assert(isTekoInstance(returnval, self.tekotype.return_type))
+        assert(isTekoInstance(returnval, self.tekotype.return_type))
         return returnval
 
     def interpret(self, si):
@@ -246,15 +257,24 @@ class TekoRealComp(TekoFunction):
 
 ###
 
-TekoPrintType = TekoFunctionType(None, TekoNewStruct([TekoStructElem(TekoObjectType,"arg")]))
+TekoPrintType = TekoFunctionType(TekoVoidType, TekoNewStruct([TekoStructElem(TekoObjectType,"obj")]))
 class TekoPrint(TekoFunction):
     def __init__(self):
         super().__init__(TekoPrintType, codeblock = None)
         
     def interpret(self, si):
-        print(str(si.get_by_label("arg")))
-        return None
+        print(str(si.get_by_label("obj")))
+        return TekoVoid
 TekoPrint = TekoPrint()
+
+TekoTypeofType = TekoFunctionType(TekoType, TekoNewStruct([TekoStructElem(TekoObjectType,"obj")]))
+class TekoTypeof(TekoFunction):
+    def __init__(self):
+        super().__init__(TekoTypeofType, codeblock=None)
+
+    def interpret(self,si):
+        return si.get_by_label("obj").tekotype
+TekoTypeof = TekoTypeof()
 
 ###
 
@@ -271,4 +291,5 @@ class StandardNS(Namespace):
         self.declare("struct", TekoType, TekoStructType)
 
         # Standard library functions:
-        self.declare("print",  TekoPrintType, TekoPrint)
+        self.declare("print",   TekoPrintType,  TekoPrint)
+        self.declare("typeof",  TekoTypeofType, TekoTypeof)

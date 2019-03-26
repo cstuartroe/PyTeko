@@ -122,7 +122,7 @@ def isTekoType(tekoObj):
     else:
         return isTekoSubtype(tekoObj.tekotype,TekoType)
 
-TekoObjectType = TekoObject(TekoType)
+TekoObjectType = TekoObject(TekoType, name="obj")
 
 def isTekoSubtype(sub,sup):
     if not isTekoType(sub) or not isTekoType(sup):

@@ -108,10 +108,11 @@ class TekoInterpreter:
             arg = self.eval_expression(argnode.expr)
             evaluated_args.append(arg)
 
-        left.exec(evaluated_args)
+        return left.exec(evaluated_args)
 
     def eval_attr_expr(self, attr_expr):
-        raise RuntimeError("Not yet implemented!")
+        obj = self.eval_expression(attr_expr.leftexpr)
+        return obj.get(attr_expr.label.vals["label"])
 
     def eval_binop_expr(self, binop_expr):
         leftval  = self.eval_expression(binop_expr.leftexpr)
@@ -129,7 +130,11 @@ class TekoInterpreter:
         return returnval
 
     def eval_not_expr(self, not_expr):
-        raise RuntimeError("Not yet implemented!")
+        val = self.eval_expression(not_expr.expr)
+        if type(val) is not TekoBool:
+            TekoException("! must be used with boolean",not_expr.line_number)
+
+        return TekoBool(not val._boolval)
 
     def eval_comp_expr(self, comp_expr):
         leftval = self.eval_expression(comp_expr.leftexpr)
