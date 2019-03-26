@@ -24,7 +24,7 @@ Token = namedtuple("Token",["string","position","line_number"])
 
 class Tokenizer:
     PUNCT_COMBOS = ["==","<=",">=","!=","<:","+=","-=","*=",
-                    "/=","^=","%%=","{}","[]","<>"]
+                    "/=","^=","%%=","{}","[]","<>","&&","||"]
     
     def __init__(self):
         pass

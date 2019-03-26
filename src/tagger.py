@@ -129,3 +129,6 @@ def get_tags(tokens):
                 yield Tag("RealTag",token,{"real":eval(s+"0")})
             else:
                 yield Tag("IntTag",token,{"int":eval(s)})
+
+        else:
+            raise ValueError("Unreadable token: " + token.string)

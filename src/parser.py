@@ -189,7 +189,7 @@ class TekoParser:
             elif self.next().tagType == "LabelTag":
                 self.i = start
                 return self.grab_struct()
-                
+        
         self.expect("CloseTag",{"brace":brace})
         if brace == "paren" and len(exprs) == 1:
             return exprs[0]

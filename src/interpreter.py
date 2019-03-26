@@ -19,6 +19,23 @@ class TekoInterpreter:
                      ConversionExpression: "eval_conv_expr",
                      CodeBlock:            "eval_codeblock",
                      NewStructNode:        "eval_new_struct"}
+
+    BINOP_DISPATCH = {"+": "_add",
+                      "-": "_sub",
+                      "*": "_mul",
+                      "/": "_div",
+                      "^": "_exp",
+                      "%": "_mod",
+                      "&&":"_and",
+                      "||":"_or",
+                      ":": "_link"}
+
+    COMP_DISPATCH = {"==":[0],
+                     "!=":[-1,1],
+                     "<": [-1],
+                     "<=":[-1,0],
+                     ">": [1],
+                     ">=":[0,1]}
     
     def __init__(self, base_ns = StandardNS()):
         self.ns = Namespace(base_ns)
@@ -102,24 +119,11 @@ class TekoInterpreter:
         if not isTekoInstance(rightval, leftval.tekotype):
             TekoException("Incompatible types for binary operation: %s, %s" % (leftval.tekotype, rightval.tekotype), binop_expr.line_number)
 
-        if binop_expr.binop == "+":
-            returnval = leftval.get("_add").exec([rightval])
-        elif binop_expr.binop == "-":
-            returnval = leftval.get("_sub").exec([rightval])
-        elif binop_expr.binop == "*":
-            returnval = leftval.get("_mul").exec([rightval])
-        elif binop_expr.binop == "/":
-            returnval = leftval.get("_div").exec([rightval])
-        elif binop_expr.binop == "^":
-            returnval = leftval.get("_exp").exec([rightval])
-        elif binop_expr.binop == "%":
-            returnval = leftval.get("_mod").exec([rightval])
-        elif binop_expr.binop == "&&":
-            returnval = leftval.get("_and").exec([rightval])
-        elif binop_expr.binop == "||":
-            returnval = leftval.get("_or").exec([rightval])
-        elif binop_expr.binop == ":":
-            returnval = leftval.get("_link").exec([rightval])
+        binop_funcname = TekoInterpreter.BINOP_DISPATCH[binop_expr.binop]
+        try:
+            returnval = leftval.get(binop_funcname).exec([rightval])
+        except AttributeError as e:
+            TekoException(str(e), binop_expr.line_number)
 
         assert(returnval.tekotype == leftval.tekotype)
         return returnval
@@ -128,7 +132,35 @@ class TekoInterpreter:
         raise RuntimeError("Not yet implemented!")
 
     def eval_comp_expr(self, comp_expr):
-        raise RuntimeError("Not yet implemented!")
+        leftval = self.eval_expression(comp_expr.leftexpr)
+        rightval = self.eval_expression(comp_expr.rightexpr)
+        if not isTekoInstance(rightval, leftval.tekotype):
+            TekoException("Incompatible types for comparison: %s, %s" % (leftval.tekotype, rightval.tekotype), comp_expr.line_number)
+
+        if comp_expr.comp == "<:":
+            raise RuntimeError("Not yet implemented!")
+        
+        else:
+            if leftval.ns.is_free("_compare"):
+                if comp_expr.comp not in ["==","!="]:
+                    TekoException(str(leftval) + " has no attribute _compare", comp_expr.line_number)
+                    
+                comp_result = leftval.get("_eq").exec([rightval])
+                if comp_expr.comp == "==":
+                    returnval = comp_result
+                else:
+                    returnval = TekoBool(not comp_result._boolval)
+                
+            else:
+                assert(leftval.ns.is_free("_eq"))
+                comp_result = leftval.get("_compare").exec([rightval])
+                assert(type(comp_result) is TekoInt)
+                assert(comp_result._intval in [-1, 0, 1])
+                b = comp_result._intval in TekoInterpreter.COMP_DISPATCH[comp_expr.comp]
+                returnval = TekoBool(b)            
+
+        assert(type(returnval) is TekoBool)
+        return returnval
     
     def eval_conv_expr(self, conv_expr):
         evaluated_expr = self.eval_expression(conv_expr.leftexpr)
