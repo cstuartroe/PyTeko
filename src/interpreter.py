@@ -37,8 +37,9 @@ class TekoInterpreter:
                      ">": [1],
                      ">=":[0,1]}
     
-    def __init__(self, owner, base_ns = StandardNS()):
-        self.ns = Namespace(owner, base_ns)
+    def __init__(self, owner):
+        assert(type(owner) is TekoModule or isinstance(owner, TekoFunction))
+        self.owner = owner
 
     def exec(self, statement):
         method_name = TekoInterpreter.STMT_DISPATCH[type(statement)]
@@ -84,7 +85,7 @@ class TekoInterpreter:
     def eval_simple_expr(self, simple_expr):
         tag = simple_expr.tag
         if tag.tagType == "LabelTag":
-            return self.ns.get_var(tag.vals["label"])
+            return self.owner.get_var(tag.vals["label"])
         elif tag.tagType == "StringTag":
             return TekoString(tag.vals["string"])
         elif tag.tagType == "IntTag":

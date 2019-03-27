@@ -14,7 +14,7 @@ if __name__ == "__main__":
     tp = TekoParser(args.file)
     stmts = list(tp.parse())
 
-    module = TekoObject(TekoVoidType) # switch to TekoModule()
+    module = TekoModule(name="__main__", owner=StandardLibrary) # switch to TekoModule()
     ti = TekoInterpreter(module)
     print("---Beginning Teko Interpretation---")
     for stmt in stmts:
