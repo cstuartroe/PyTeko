@@ -37,8 +37,8 @@ class TekoInterpreter:
                      ">": [1],
                      ">=":[0,1]}
     
-    def __init__(self, base_ns = StandardNS()):
-        self.ns = Namespace(base_ns)
+    def __init__(self, owner, base_ns = StandardNS()):
+        self.ns = Namespace(owner, base_ns)
 
     def exec(self, statement):
         method_name = TekoInterpreter.STMT_DISPATCH[type(statement)]
@@ -84,7 +84,7 @@ class TekoInterpreter:
     def eval_simple_expr(self, simple_expr):
         tag = simple_expr.tag
         if tag.tagType == "LabelTag":
-            return self.ns.get(tag.vals["label"])
+            return self.ns.get_var(tag.vals["label"])
         elif tag.tagType == "StringTag":
             return TekoString(tag.vals["string"])
         elif tag.tagType == "IntTag":
@@ -112,7 +112,12 @@ class TekoInterpreter:
 
     def eval_attr_expr(self, attr_expr):
         obj = self.eval_expression(attr_expr.leftexpr)
-        return obj.get(attr_expr.label.vals["label"])
+        label = attr_expr.label.vals["label"]
+        
+        if obj.is_free_attr(label):
+            TekoException("%s has no attribute %s" % (repr(obj),label), attr_expr.line_number)
+        else:
+            return obj.get_attr(label)
 
     def eval_binop_expr(self, binop_expr):
         leftval  = self.eval_expression(binop_expr.leftexpr)
@@ -121,10 +126,7 @@ class TekoInterpreter:
             TekoException("Incompatible types for binary operation: %s, %s" % (leftval.tekotype, rightval.tekotype), binop_expr.line_number)
 
         binop_funcname = TekoInterpreter.BINOP_DISPATCH[binop_expr.binop]
-        try:
-            returnval = leftval.get(binop_funcname).exec([rightval])
-        except AttributeError as e:
-            TekoException(str(e), binop_expr.line_number)
+        returnval = leftval.get_attr(binop_funcname).exec([rightval])
 
         assert(returnval.tekotype == leftval.tekotype)
         return returnval
@@ -146,19 +148,19 @@ class TekoInterpreter:
             raise RuntimeError("Not yet implemented!")
         
         else:
-            if leftval.ns.is_free("_compare"):
+            if leftval.ns.is_free_attr("_compare"):
                 if comp_expr.comp not in ["==","!="]:
                     TekoException(str(leftval) + " has no attribute _compare", comp_expr.line_number)
                     
-                comp_result = leftval.get("_eq").exec([rightval])
+                comp_result = leftval.get_attr("_eq").exec([rightval])
                 if comp_expr.comp == "==":
                     returnval = comp_result
                 else:
                     returnval = TekoBool(not comp_result._boolval)
                 
             else:
-                assert(leftval.ns.is_free("_eq"))
-                comp_result = leftval.get("_compare").exec([rightval])
+                assert(leftval.ns.is_free_attr("_eq"))
+                comp_result = leftval.get_attr("_compare").exec([rightval])
                 assert(type(comp_result) is TekoInt)
                 assert(comp_result._intval in [-1, 0, 1])
                 b = comp_result._intval in TekoInterpreter.COMP_DISPATCH[comp_expr.comp]
@@ -168,12 +170,13 @@ class TekoInterpreter:
         return returnval
     
     def eval_conv_expr(self, conv_expr):
-        evaluated_expr = self.eval_expression(conv_expr.leftexpr)
-        
-        if conv_expr.conv == "$":
-            return TekoString(str(evaluated_expr))
-        else:
-            raise RuntimeError("Not yet implemented!")
+        val = self.eval_expression(conv_expr.leftexpr)
+
+        conv_funcname = TekoInterpreter.CONV_DISPATCH[conv_expr.conv]
+        try:
+            return TekoString(val.get(conv_funcname).exec([]))
+        except AttributeError:
+            TekoException(str(val) + " cannot undergo conversion " + conv_expr.conv)
 
     def eval_codeblock(self, codeblock):
         raise RuntimeError("Not yet implemented!")

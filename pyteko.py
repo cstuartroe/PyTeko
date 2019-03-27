@@ -1,6 +1,7 @@
 import argparse
 
 from src.parser import TekoParser
+from src.primitives import * # TekoModule
 from src.interpreter import TekoInterpreter
 
 parser = argparse.ArgumentParser()
@@ -13,6 +14,8 @@ if __name__ == "__main__":
     tp = TekoParser(args.file)
     stmts = list(tp.parse())
 
-    ti = TekoInterpreter()
+    module = TekoObject(TekoVoidType) # switch to TekoModule()
+    ti = TekoInterpreter(module)
+    print("---Beginning Teko Interpretation---")
     for stmt in stmts:
         ti.exec(stmt)
