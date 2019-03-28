@@ -1,6 +1,8 @@
+import sys
+
 def TekoException(message, line_number):
     print("Teko interpreter exception (line %s): %s" % (line_number,message))
-    quit()
+    sys.exit()
 
 def TekoAssert(b):
     try:

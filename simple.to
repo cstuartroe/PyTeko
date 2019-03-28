@@ -1,13 +1,21 @@
-int n = 3 + 5;
+int n = 0;
 str s;
 
-s = "Hello";
+while (n < 10) {
+	print(n$ + "\n");
+	n += 1;
+}
 
-print(n + 6);
-n = 3;
-print(n + 6);
+print("Type your name: ");
+s = input();
+print("Hello " + s + "!\n");
 
-let x = 3., b = true;
+if (s == "John") {
+	print("Your name is John");
+} else if ((s == "Jane") || (s == "Susie")) {
+	print("Your name is either Jane or Susie");
+} else {
+	print("Your name is something else");
+}
 
-x._add = x._sub; // correctly raises error
-print(x + 1.);
+print();
