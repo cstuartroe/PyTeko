@@ -111,9 +111,7 @@ class TekoParser:
         if self.next().tagType == "DotTag":
             nextnext = self.next(2)[1]
             if nextnext.tagType == "LabelTag":
-                new_expr = AttrExpression(leftexpr = expr, label = nextnext)
-                self.step()
-                self.step()
+                self.tags[self.i] = Tag("AttrTag", self.next().token)
             else:
                 self.tags[self.i] = Tag("ConversionTag",self.next().token,{"conversion":"."})
 
@@ -156,6 +154,11 @@ class TekoParser:
             conv = self.next().vals["conversion"]
             self.step()
             new_expr = ConversionExpression(leftexpr = expr, conv = conv)
+
+        elif self.next().tagType == "AttrTag":            
+            new_expr = AttrExpression(leftexpr = expr, label = nextnext)
+            self.step()
+            self.step()
 
         if not new_expr:
             # print(expr)

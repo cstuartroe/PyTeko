@@ -2,7 +2,7 @@ int n = 0;
 str s;
 
 while (n < 10) {
-	print(n$ + "\n");
+	print((n^2)$ + "\n");
 	n += 1;
 }
 
@@ -19,3 +19,10 @@ if (s == "John") {
 }
 
 print();
+
+print(print$ + "\n");
+print(n._compare$ + "\n");
+
+int{} intlist = {1,2,3};
+print(intlist$ + "\n");
+print(intlist. + "\n"); // correctly throws error

@@ -53,7 +53,7 @@ class Tag:
                 "OpenTag":{"brace"},"CloseTag":{"brace"},
                 "LAngleTag":set(),"RAngleTag":set(), "BinOpTag":{"binop"},
                 "SetterTag":{"setter"},"ComparisonTag":{"comparison"},
-                "ConversionTag":{"conversion"}}
+                "ConversionTag":{"conversion"}, "AttrTag":set()}
 
     def __init__(self,tagType,token,vals={}):
         assert(tagType in Tag.tagTypes)
