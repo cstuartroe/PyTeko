@@ -5,6 +5,7 @@ from .general import *
 class Variable:
     def __init__(self, tekotype, val=None):
         assert(isTekoType(tekotype))
+        assert(tekotype is not TekoVoidType)
         self.tekotype = tekotype
         self.val = val
 
@@ -164,8 +165,17 @@ class TekoInterpreter:
         for decl in decl_stmt.declarations:
             self.exec_declaration(decl)
 
-    def exec_asst_stmt(self, asst):
-        raise RuntimeError("Not yet implemented!")
+    def exec_asst_stmt(self, asst_stmt):
+        entity, label = self.eval_lhs(asst_stmt.left)
+        val = self.eval_expression(asst_stmt.right)
+
+        if entity.immutable:
+            TekoException(repr(entity) + " is immutable", -1)
+        
+        if not (isTekoInstance(val, entity.tekotype_var(label))):
+            TekoException(str(val) + " is not of type " + str(entity.tekotype_var(label)), asst_stmt.line_number)
+            
+        entity.set(label, val)
 
     def exec_if_stmt(self, if_stmt):
         raise RuntimeError("Not yet implemented!")
@@ -186,8 +196,46 @@ class TekoInterpreter:
         method = getattr(self, method_name)
         return method(expression)
 
-    def exec_declaration(self, expression):
-        raise RuntimeError("Not yet implemented!")
+    def exec_declaration(self, declaration):
+        if self.owner.immutable:
+            TekoException(repr(self.owner) + " is immutable", -1)
+            
+        label = declaration.label.vals["label"]
+
+        if declaration.expression:
+            val = self.eval_expression(declaration.expression)
+        else:
+            val = None
+        
+        if declaration.tekotype:
+            tekotype = self.eval_expression(declaration.tekotype)
+            
+            if declaration.struct:
+                tekotype = TekoFunctionType(return_type = tekotype, arg_struct = self.eval_new_struct(declaration.struct))
+        else:
+            assert(val is not None)
+            tekotype = val.tekotype
+
+        if tekotype is TekoVoidType:
+            TekoException("Cannot create variable " + label + " of type void", declaration.line_number)
+        
+        if (val is not None) and (not (isTekoInstance(val, tekotype))):
+            TekoException(str(val) + " is not of type " + str(tekotype), declaration.line_number)
+
+        self.owner.declare(label = label, tekotype = tekotype, val = val)
+
+    def eval_lhs(self, lhs):
+        if type(lhs) is SimpleExpression:
+            assert lhs.tag.tagType == "LabelTag"
+            entity = self.owner
+            label = lhs.tag.vals["label"]
+        elif type(lhs) is AttrExpression:
+            entity = self.eval_expression(lhs.leftexpr)
+            label = lhs.label.vals["label"]
+        else:
+            TekoException("Invalid LHS: " + str(lhs), lhs.line_number)
+
+        return entity, label
 
     # # # Evaluating expression types:
 
@@ -299,16 +347,17 @@ class TekoInterpreter:
 THROW_ERROR = 0
 
 class TekoObject:
-    def __init__(self, tekotype, name="TekoObject", parent=None, bootstrapping=False):
+    def __init__(self, tekotype, name="TekoObject", parent=None, immutable=False):
         assert(tekotype is None or isTekoType(tekotype))
         assert(type(name) == str)
         self.tekotype = tekotype
         self.name = name
-        
         self.ns = Namespace(self)
                    
         if parent is not None:
             self.set_parent(parent)
+            
+        self.immutable = immutable
 
     def declare(self, label, tekotype, val = None):
         self.ns.declare(label, tekotype, val)
@@ -382,6 +431,11 @@ def isTekoInstance(tekoObj, tekotype):
     assert(isTekoType(tekotype))
     return isTekoSubtype(tekoObj.tekotype,tekotype)
 
+TekoType            = TekoObject(None,     name="type", immutable = True)
+TekoType.tekotype   = TekoType
+
+TekoObjectType      = TekoObject(TekoType, name="obj",  immutable = True)
+
 ###
 
 # Structs and functions need to be defined first because other primitives have function attributes
@@ -404,7 +458,7 @@ class TekoStructElem:
 
 class TekoNewStruct(TekoObject):
     def __init__(self, struct_elems, **kwargs):
-        super().__init__(TekoStructType, **kwargs)
+        super().__init__(TekoStructType, immutable = True, **kwargs)
 
         self.struct_elems = []
         for struct_elem in struct_elems:
@@ -443,7 +497,7 @@ class TekoFunctionType(TekoObject):
     def __init__(self, return_type, arg_struct, **kwargs):
         assert(isTekoType(return_type))
         assert(isinstance(arg_struct, TekoNewStruct))
-        super().__init__(TekoType, **kwargs)
+        super().__init__(TekoType, immutable = True, **kwargs)
         self.return_type = return_type
         self.arg_struct = arg_struct
         self.declare("_args",TekoStructType,self.arg_struct)
@@ -477,92 +531,14 @@ class TekoFunction(TekoObject):
         for stmt in self.codeblock.statements:
             ti.exec(stmt)
         raise RuntimeError("Returning not yet implemented")
-
-###
-
-class TekoString(TekoObject):
-    def __init__(self, s, **kwargs):
-        assert(type(s) == str)
-        super().__init__(TekoStringType, name = s, **kwargs)
-        self._strval = s
-        self.declare(label = "_add", tekotype = TekoStringBinopType, val = TekoStringAdd(outer = self))
-        self.declare(label = "_eq",  tekotype = TekoStringEqType,    val = TekoStringEq(outer = self))
-
-    def __str__(self):
-        return self._strval
-
-    def __repr__(self):
-        return '<str :: %s>' % self._strval.__repr__()
-
-class TekoStringAdd(TekoFunction):
-    def __init__(self, **kwargs):
-        super().__init__(ftype = TekoStringBinopType, codeblock=None, name="_add", **kwargs)
-
-    def interpret(self, si):
-        return TekoString(self.outer._strval + si.get_by_label("other")._strval)
-
-class TekoStringEq(TekoFunction):
-    def __init__(self, **kwargs):
-        super().__init__(ftype = TekoStringEqType, codeblock=None, name="_eq", **kwargs)
-
-    def interpret(self, si):
-        return TekoBool(self.outer._strval == si.get_by_label("other")._strval)
-
-class TekoTostr(TekoFunction):
-    def __init__(self, **kwargs):
-        super().__init__(ftype = TekoTostrType, codeblock = None, name="_tostr", bootstrapping=True, **kwargs)
-
-    def interpret(self, si):
-        return TekoString(str(self.outer))
-
-###
-
-class TekoBool(TekoObject):
-    def __init__(self, b):
-        assert(type(b) == bool)
-        super().__init__(TekoBoolType, name = str(b).lower())
-        self._boolval = b
-        self.declare(label = "_and", tekotype = TekoBoolBinopType, val = TekoBoolBinop(bool_ns = self.ns, op = "_and", name="_and", outer = self))
-        self.declare(label = "_or",  tekotype = TekoBoolBinopType, val = TekoBoolBinop(bool_ns = self.ns, op = "_or",  name="_or", outer = self))
-
-class TekoBoolBinop(TekoFunction):
-    OP_NAMES = {"_and":"__and__",
-                "_or":"__or__"}
-    
-    def __init__(self, bool_ns, op, **kwargs):
-        super().__init__(TekoBoolBinopType, codeblock=None, **kwargs)
-        self.op = op
-        
-    def interpret(self, si):
-        leftbool = self.outer._boolval
-        rightbool = si.get_by_label("other")._boolval
-        python_opname = TekoBoolBinop.OP_NAMES[self.op]
-        
-        return TekoBool(getattr(leftbool,python_opname)(rightbool))
-
-###
-
-TekoType            = TekoObject(None,         name="type",   bootstrapping=True)
-TekoType.tekotype   = TekoType
-
-TekoObjectType      = TekoObject(TekoType,     name="obj",    bootstrapping=True)
             
-TekoVoidType        = TekoObject(TekoType,     name="void",   bootstrapping=True)
-TekoVoid            = TekoObject(TekoVoidType,                bootstrapping=True)
-
-TekoStructType      = TekoObject(TekoType,     name="struct", bootstrapping=True, parent=TekoType)
-
-TekoBoolType        = TekoObject(TekoType,     name="bool",   bootstrapping=True)
-TekoBoolBinopType   = TekoFunctionType(TekoBoolType,   TekoNewStruct([TekoStructElem(TekoBoolType,"other")],   bootstrapping=True), bootstrapping=True)
-
-TekoStringType      = TekoObject(TekoType,     name="str",    bootstrapping=True)
-TekoStringBinopType = TekoFunctionType(TekoStringType, TekoNewStruct([TekoStructElem(TekoStringType,"other")], bootstrapping=True), bootstrapping=True)
-TekoStringEqType    = TekoFunctionType(TekoBoolType,   TekoNewStruct([TekoStructElem(TekoStringType,"other")], bootstrapping=True), bootstrapping=True)
-TekoTostrType       = TekoFunctionType(TekoStringType, TekoNewStruct([],                                       bootstrapping=True), bootstrapping=True)
+TekoVoidType   = TekoObject(TekoType, name="void",   immutable=True)
+TekoVoid       = TekoObject(TekoVoidType)
+TekoStructType = TekoObject(TekoType, name="struct", immutable=True, parent=TekoType)
 
 ###
 
-TekoModuleType = TekoObject(TekoType, name="module", bootstrapping=True)
+TekoModuleType = TekoObject(TekoType, name="module", immutable=True)
 
 class TekoModule(TekoObject):
     def __init__(self, name, filename, outers = [], **kwargs):
@@ -577,25 +553,100 @@ class TekoModule(TekoObject):
         for stmt in stmts:
             ti.exec(stmt)
 
-StandardLibrary = TekoModule(name="stdlib", filename = None, bootstrapping=True)
+StandardLibrary = TekoModule(name="stdlib", filename = None, immutable=True)
 
 StandardLibrary.declare("type",   TekoType, TekoType)
 StandardLibrary.declare("obj",    TekoType, TekoObjectType)
-StandardLibrary.declare("void",   TekoType, TekoVoidType)
-StandardLibrary.declare("str",    TekoType, TekoStringType)
-StandardLibrary.declare("bool",   TekoType, TekoBoolType)
-StandardLibrary.declare("struct", TekoType, TekoStructType)
 StandardLibrary.declare("module", TekoType, TekoModuleType)
+StandardLibrary.declare("void",   TekoType, TekoVoidType)
+StandardLibrary.declare("struct", TekoType, TekoStructType)
 
 ###
 
-TekoIntType = TekoObject(tekotype = TekoType, name = "int")
+TekoBoolType = TekoObject(TekoType, name="bool", immutable=True)
+StandardLibrary.declare("bool", TekoType, TekoBoolType)
+
+class TekoBool(TekoObject):
+    def __init__(self, b):
+        assert(type(b) == bool)
+        super().__init__(TekoBoolType, name = str(b).lower(), immutable=True)
+        self._boolval = b
+        self.declare(label = "_and", tekotype = TekoBoolBinopType, val = TekoBoolBinop(bool_ns = self.ns, op = "_and", name="_and", outer = self))
+        self.declare(label = "_or",  tekotype = TekoBoolBinopType, val = TekoBoolBinop(bool_ns = self.ns, op = "_or",  name="_or", outer = self))
+
+TekoBoolBinopType = TekoFunctionType(TekoBoolType, TekoNewStruct([TekoStructElem(TekoBoolType,"other")]))
+
+class TekoBoolBinop(TekoFunction):
+    OP_NAMES = {"_and":"__and__",
+                "_or":"__or__"}
+    
+    def __init__(self, bool_ns, op, **kwargs):
+        super().__init__(TekoBoolBinopType, codeblock=None, immutable=True, **kwargs)
+        self.op = op
+        
+    def interpret(self, si):
+        leftbool = self.outer._boolval
+        rightbool = si.get_by_label("other")._boolval
+        python_opname = TekoBoolBinop.OP_NAMES[self.op]
+        
+        return TekoBool(getattr(leftbool,python_opname)(rightbool))
+
+###
+
+TekoStringType = TekoObject(TekoType, name="str", immutable=True)
+StandardLibrary.declare("str", TekoType, TekoStringType)
+
+class TekoString(TekoObject):
+    def __init__(self, s, **kwargs):
+        assert(type(s) == str)
+        super().__init__(TekoStringType, name = s, immutable=True, **kwargs)
+        self._strval = s
+        self.immutable = True
+        self.declare(label = "_add", tekotype = TekoStringBinopType, val = TekoStringAdd(outer = self))
+        self.declare(label = "_eq",  tekotype = TekoStringEqType,    val = TekoStringEq(outer = self))
+
+    def __str__(self):
+        return self._strval
+
+    def __repr__(self):
+        return '<str :: %s>' % self._strval.__repr__()
+
+TekoStringBinopType = TekoFunctionType(TekoStringType, TekoNewStruct([TekoStructElem(TekoStringType,"other")]))
+
+class TekoStringAdd(TekoFunction):
+    def __init__(self, **kwargs):
+        super().__init__(ftype = TekoStringBinopType, codeblock=None, name="_add", immutable=True, **kwargs)
+
+    def interpret(self, si):
+        return TekoString(self.outer._strval + si.get_by_label("other")._strval)
+    
+TekoStringEqType = TekoFunctionType(TekoBoolType,   TekoNewStruct([TekoStructElem(TekoStringType,"other")]))
+
+class TekoStringEq(TekoFunction):
+    def __init__(self, **kwargs):
+        super().__init__(ftype = TekoStringEqType, codeblock=None, name="_eq", immutable=True, **kwargs)
+
+    def interpret(self, si):
+        return TekoBool(self.outer._strval == si.get_by_label("other")._strval)
+    
+TekoTostrType = TekoFunctionType(TekoStringType, TekoNewStruct([]))
+
+class TekoTostr(TekoFunction):
+    def __init__(self, **kwargs):
+        super().__init__(ftype = TekoTostrType, codeblock = None, name="_tostr", immutable=True, **kwargs)
+
+    def interpret(self, si):
+        return TekoString(str(self.outer))
+
+###
+
+TekoIntType = TekoObject(tekotype = TekoType, name = "int", immutable=True)
 StandardLibrary.declare("int", TekoType, TekoIntType)
 
 class TekoInt(TekoObject):    
     def __init__(self, n, **kwargs):
         assert(type(n) == int)
-        super().__init__(TekoIntType, name = str(n), **kwargs)
+        super().__init__(TekoIntType, name = str(n), immutable=True, **kwargs)
         self._intval = n
 
         for teko_opname in TekoIntBinop.OP_NAMES:
@@ -614,7 +665,7 @@ class TekoIntBinop(TekoFunction):
                 "_mod":"__mod__"}
     
     def __init__(self, op, **kwargs):
-        super().__init__(ftype = TekoIntBinopType, codeblock = None, **kwargs)
+        super().__init__(ftype = TekoIntBinopType, codeblock = None, immutable=True, **kwargs)
         self.op = op
         
     def interpret(self, si):
@@ -628,7 +679,7 @@ TekoIntCompType = TekoFunctionType(return_type = TekoIntType, arg_struct = TekoN
 
 class TekoIntComp(TekoFunction):
     def __init__(self, **kwargs):
-        super().__init__(ftype = TekoIntCompType, codeblock = None, **kwargs)
+        super().__init__(ftype = TekoIntCompType, codeblock = None, immutable=True, **kwargs)
 
     def interpret(self, si):
         leftint = self.outer._intval
@@ -645,13 +696,13 @@ class TekoIntComp(TekoFunction):
 
 ###
 
-TekoRealType = TekoObject(TekoType, name="real")
+TekoRealType = TekoObject(TekoType, name="real", immutable=True)
 StandardLibrary.declare("real", TekoType, TekoRealType)
 
 class TekoReal(TekoObject):    
     def __init__(self, x, **kwargs):
         assert(type(x) == float)
-        super().__init__(TekoRealType, name = str(x), **kwargs)
+        super().__init__(TekoRealType, name = str(x), immutable=True, **kwargs)
         self._realval = x
 
         for teko_opname in TekoRealBinop.OP_NAMES:
@@ -669,7 +720,7 @@ class TekoRealBinop(TekoFunction):
                 "_exp":"__pow__"}
     
     def __init__(self, op, **kwargs):
-        super().__init__(ftype = TekoRealBinopType, codeblock=None, **kwargs)
+        super().__init__(ftype = TekoRealBinopType, codeblock=None, immutable=True, **kwargs)
         self.op = op
         
     def interpret(self, si):
@@ -683,7 +734,7 @@ TekoRealCompType = TekoFunctionType(return_type = TekoIntType, arg_struct = Teko
 
 class TekoRealComp(TekoFunction):
     def __init__(self, **kwargs):
-        super().__init__(ftype = TekoRealCompType, codeblock=None, **kwargs)
+        super().__init__(ftype = TekoRealCompType, codeblock=None, immutable=True, **kwargs)
 
     def interpret(self, si):
         leftreal = self.outer._realval
@@ -703,6 +754,7 @@ class TekoRealComp(TekoFunction):
 # These classes are only declared so that interpret can be overridden
 
 TekoPrintType = TekoFunctionType(return_type = TekoVoidType, arg_struct = TekoNewStruct([TekoStructElem(TekoObjectType,"obj", default=TekoString(""))]))
+
 class TekoPrint(TekoFunction):
     def __init__(self, **kwargs):
         super().__init__(ftype = TekoPrintType, codeblock = None, **kwargs)
@@ -710,15 +762,33 @@ class TekoPrint(TekoFunction):
     def interpret(self, si):
         print(si.get_by_label("obj").get_attr("_tostr").exec([])._strval)
         return TekoVoid
-TekoPrint = TekoPrint(name = "print", outer = StandardLibrary)
+    
+TekoPrint = TekoPrint(name = "print", outer = StandardLibrary, immutable=True)
 StandardLibrary.declare("print", TekoPrintType, TekoPrint)
 
 TekoTypeofType = TekoFunctionType(return_type = TekoType, arg_struct = TekoNewStruct([TekoStructElem(TekoObjectType,"obj")]))
+
 class TekoTypeof(TekoFunction):
     def __init__(self, **kwargs):
         super().__init__(ftype = TekoTypeofType, codeblock=None, **kwargs)
 
     def interpret(self,si):
         return si.get_by_label("obj").tekotype
-TekoTypeof = TekoTypeof(name = "typeof", outer = StandardLibrary)
+    
+TekoTypeof = TekoTypeof(name = "typeof", outer = StandardLibrary, immutable=True)
 StandardLibrary.declare("typeof",  TekoTypeofType, TekoTypeof)
+
+TekoAssertType = TekoFunctionType(return_type = TekoVoidType, arg_struct = TekoNewStruct([TekoStructElem(TekoBoolType,"statement")]))
+
+class TekoAssert(TekoFunction):
+    def __init__(self, **kwargs):
+        super().__init__(ftype = TekoAssertType, codeblock = None, **kwargs)
+
+    def interpret(self, si):
+        b = si.get_by_label("statement")._boolval
+        if not b:
+            TekoException("Assertion failed", -1)
+        return TekoVoid
+    
+TekoAssert = TekoAssert(name = "assert", outer = StandardLibrary, immutable=True)
+StandardLibrary.declare("assert", TekoAssertType, TekoAssert)

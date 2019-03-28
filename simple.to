@@ -1,62 +1,13 @@
-print("Hello");
-print(3);
-print(3.1);
+int n = 3 + 5;
+str s;
 
-print();
+s = "Hello";
 
-print("Hello" + " World!");
-print("Hello" == "Hello");
-print("Hello" != "Hello");
-print("Hello" == " World!");
+print(n + 6);
+n = 3;
+print(n + 6);
 
-print();
+let x = 3., b = true;
 
-print(3 == 3);
-print(3 != 3);
-print(3 > 3);
-print(3 <= 3);
-print(3 > 6);
-print(3 + 10);
-print(3 / 10);
-print(2 ^ 4);
-print(10 % 3);
-
-print();
-
-print(3.1 == 3.1);
-print(3.1 == 3.2);
-print(3.1 < 3.2);
-print(3.1 >= 3.2);
-print(3.1 * 1.2);
-print(2. ^ 10.5);
-
-print();
-
-print(typeof("Hello"));
-print(typeof(true));
-print(typeof(3.1));
-
-print();
-
-print("Hello"._eq);
-print((3)._compare);
-print((3.1)._add);
-print(true._or);
-print(print);
-
-print();
-
-print(typeof("Hello"._eq));
-print(typeof(false._and));
-print(typeof(typeof("Hello"._eq)));
-print(typeof(typeof((3.1)._add)));
-
-print();
-
-print(typeof(print));
-print(typeof(print()));
-print(typeof(typeof));
-print(typeof(int));
-print(typeof(type));
-print(typeof("Hello"._eq)._args);
-print(typeof(typeof(("Hello"._eq))._args));
+x._add = x._sub; // correctly raises error
+print(x + 1.);

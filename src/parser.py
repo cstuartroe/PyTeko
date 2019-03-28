@@ -1,7 +1,6 @@
 from .general import TekoException
 from .tokenizer import Tokenizer, Token
 from .tagger import *
-#from .primitives import *
 from .parsenode import *
 
 class Precedence:
@@ -410,7 +409,7 @@ class TekoParser:
                 self.step()
 
         self.expect("CloseTag",{"brace":"paren"})
-        struct = NewStruct(line_number, elems)
+        struct = NewStructNode(line_number, elems)
         return struct
 
     # def grab_map

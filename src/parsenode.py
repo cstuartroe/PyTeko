@@ -131,7 +131,7 @@ class Declaration(Node):
         
         assert(tekotype is None or isinstance(tekotype, Expression))
         assert(label.tagType == "LabelTag")
-        assert(struct is None or isinstance(struct, NewStruct))
+        assert(struct is None or isinstance(struct, NewStructNode))
         assert(expression is None or isinstance(expression, Expression))
 
         self.tekotype = tekotype
@@ -150,16 +150,6 @@ class Declaration(Node):
         if self.expression is not None:
             s += " = " + str(self.expression)
         return s
-
-class Assignment(Node):
-    def __init__(self, label, expression=None):
-        assert(label.tagType == "LabelTag")
-        assert(expression is None or isinstance(expression, Expression))
-
-        self.label = label
-        self.exression = expression
-
-        self.line_number = label.token.line_number
 
 # # #
 
