@@ -131,7 +131,7 @@ class Declaration(Node):
         
         assert(tekotype is None or isinstance(tekotype, Expression))
         assert(label.tagType == "LabelTag")
-        assert(struct is None or isinstance(struct, NewStructNode))
+        assert(struct is None or isinstance(struct, Expression))
         assert(expression is None or isinstance(expression, Expression))
 
         self.tekotype = tekotype

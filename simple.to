@@ -1,35 +1,16 @@
-let n = 1;
-str s;
-while (n < 15) {
-	s = "";
-	if (n % 3 == 0) {
-		s += "Fizz ";
-	}
-	if (n % 5 == 0) {
-		s += "Buzz ";
-	}
-	if (s == "") {
-		s = n$;
-	}
-	print(s + "\n");
-	n += 1;
+int<> ns = <1,2,3,4,5>;
+
+for (int n in ns) {
+	print(n$ + "\n");
 }
 
-// int add3(int other) = (3)._add;
-// print(add3(5)$ + "\n");
+struct s = (int n);
+int add3(s) = (3)._add;
+print(add3(5)$ + "\n");
 
-int{} intlist = {1,2,3};
-int{}[] intlistarray = [{1,2,3},{4,5,6}];
-print(typeof(typeof(typeof(intlist)))$ + "\n");
+s x = s(3);
+print(x$ + "\n");
 
-int<> ints = <1,2,3,4,5,6>;
-print(ints$ + "\n");
-
-int n1 = 34;
-print(typeof(n1)$ + "\n");
-print(n1$ + "\n");
-
-obj o = 3;
-print(typeof(o)$ + "\n");
-print(o._compare$ + "\n"); // correctly issues error
-o + 5; // correctly issues error
+struct person = (str name, int toes ? 10, int eyes ? 2);
+person mary = person("Mary", eyes = 4);
+print(mary$ + "\n");

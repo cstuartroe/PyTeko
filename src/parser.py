@@ -287,7 +287,7 @@ class TekoParser:
             self.step()
 
             if self.next().tagType == "OpenTag" and self.next().vals["brace"] == "paren":
-                struct = self.grab_struct()
+                struct = self.grab_expression()
             else:
                 struct = None
 
