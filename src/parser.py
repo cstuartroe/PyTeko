@@ -81,8 +81,8 @@ class TekoParser:
             self.expect("SemicolonTag")
             return expr_stmt
 
-    def grab_expression(self, prec = -1):
-        if self.next().tagType == "OpenTag":
+    def grab_expression(self, prec = -1, accept_rangle = True):
+        if self.next().tagType == "OpenTag" or self.next().tagType == "LAngleTag":
             expr = self.grab_sequence()
         elif self.next().tagType in SIMPLE_EXPR_TAGTYPES:
             expr = SimpleExpression(self.next())
@@ -101,9 +101,9 @@ class TekoParser:
             TekoException("Illegal start to expression: " + self.next().token.string,
                           self.next().token.line_number)
             
-        return self.check_postfix(expr, prec)
+        return self.check_postfix(expr, prec, accept_rangle)
 
-    def check_postfix(self, expr, prec):
+    def check_postfix(self, expr, prec, accept_rangle = True):
         new_expr = None
 
         # some tokens have ambiguous syntactic function, which can only be determined during parsing:
@@ -121,7 +121,7 @@ class TekoParser:
         if self.next().tagType == "LAngleTag":
             self.tags[self.i] = Tag("ComparisonTag",self.next().token,{"comparison":"<"})
 
-        if self.next().tagType == "RAngleTag":
+        if self.next().tagType == "RAngleTag" and accept_rangle:
             self.tags[self.i] = Tag("ComparisonTag",self.next().token,{"comparison":">"})
 
         # this is actual postfix checking:
@@ -171,7 +171,10 @@ class TekoParser:
     # or any type of Expression with (expr)
     def grab_sequence(self):        
         start = self.i
-        brace = self.next().vals["brace"]
+        if self.next().tagType == "LAngleTag":
+            brace = "angle"
+        else:
+            brace = self.next().vals["brace"]
         
         if brace == "curly" and self.codeblock_forensic():
             return self.grab_codeblock()
@@ -180,10 +183,10 @@ class TekoParser:
         self.step()
         exprs = []
         
-        cont = (self.next().tagType != "CloseTag")
+        cont = (self.next().tagType != "CloseTag" and not (brace == "angle" and self.next().tagType == "RAngleTag"))
         while cont:
             cont = False
-            expr = self.grab_expression()
+            expr = self.grab_expression(accept_rangle = (brace != "angle"))
             exprs.append(expr)
             if self.next().tagType == "CommaTag":
                 cont = True
@@ -191,8 +194,11 @@ class TekoParser:
             elif self.next().tagType == "LabelTag":
                 self.i = start
                 return self.grab_struct()
-        
-        self.expect("CloseTag",{"brace":brace})
+
+        if brace == "angle":
+            self.expect("RAngleTag")
+        else:
+            self.expect("CloseTag",{"brace":brace})
         if brace == "paren" and len(exprs) == 1:
             return exprs[0]
         else:
@@ -404,7 +410,7 @@ class TekoParser:
             else:
                 default = None
 
-            elem = StructElem(tekotype, label, default)
+            elem = StructElemNode(tekotype, label, default)
             elems.append(elem)
             
             if self.next().tagType == "CommaTag":

@@ -1,28 +1,30 @@
-int n = 0;
-str s;
+obj o = 3;
+print(o._add$ + "\n");
+print(typeof(o)$ + "\n");
 
-while (n < 10) {
-	print((n^2)$ + "\n");
+let n = 1;
+str s;
+while (n <= 15) {
+	s = "";
+	if (n % 3 == 0) {
+		s += "Fizz ";
+	}
+	if (n % 5 == 0) {
+		s += "Buzz ";
+	}
+	if (s == "") {
+		s = n$;
+	}
+	print(s + "\n");
 	n += 1;
 }
 
-print("Type your name: ");
-s = input();
-print("Hello " + s + "!\n");
-
-if (s == "John") {
-	print("Your name is John");
-} else if ((s == "Jane") || (s == "Susie")) {
-	print("Your name is either Jane or Susie");
-} else {
-	print("Your name is something else");
-}
-
-print();
-
-print(print$ + "\n");
-print(n._compare$ + "\n");
+/* int add3(int other) = (3)._add;
+print(add3(5)$ + "\n"); */
 
 int{} intlist = {1,2,3};
-print(intlist$ + "\n");
-print(intlist. + "\n"); // correctly throws error
+int{}[] intlistarray = [{1,2,3},{4,5,6}];
+print(typeof(typeof(typeof(intlist)))$ + "\n");
+
+int<> ints = <1,2,3,4,5,6>;
+print(ints$ + "\n");

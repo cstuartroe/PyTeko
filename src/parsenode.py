@@ -289,7 +289,7 @@ class NewStructNode(Expression):
     def __init__(self, line_number, elems):
         super().__init__(line_number)
         
-        assert(all(isinstance(elem, StructElem) for elem in elems))
+        assert(all(isinstance(elem, StructElemNode) for elem in elems))
         self.elems = elems
 
     def __str__(self):
