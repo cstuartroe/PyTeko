@@ -1,16 +1,15 @@
-int<> ns = <1,2,3,4,5>;
+int n = 3, s = 5.0;
+println(n);
 
-for (int n in ns) {
-	print(n$ + "\n");
-}
+5 + 3 * 4 + 8 ^ ~7 ^ 9;
 
-struct s = (int n);
-int add3(s) = (3)._add;
-print(add3(5)$ + "\n");
+if condition {
+  do_this();
+} else if {
+  another_condition();
+} {
+  do_that();
+} else do_another_thing + 5;
+let body = (str hair_color, int height, int num_fingers ? 10);
 
-s x = s(3);
-print(x$ + "\n");
-
-struct person = (str name, int toes ? 10, int eyes ? 2);
-person mary = person("Mary", eyes = 4);
-print(mary$ + "\n");
+me *= you;
